@@ -1,0 +1,590 @@
+---
+title: "Untitled"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Read in packages:
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(DBI)
+library(odbc)
+library(haven)
+library(lme4)
+library(lmerTest)
+library(nlme)
+library(ggpubr)
+```
+
+
+Load data:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/F_cal_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/F_cal_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+```
+
+
+Check normality of the features and remove outliers:
+```{r}
+sum(test_df_CD$VALUE == "<30" | test_df_CD$VALUE == ">1800") / dim(test_df_CD)[1]
+sum(test_df_UC$VALUE == "<30" | test_df_UC$VALUE == ">1800")/ dim(test_df_UC)[1]
+
+#If VALUE is transformed to numeric, it will remove values named <30 and >1800 (CD = 55 samples, UC = 40)
+# Change til median value
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<30)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<30", m_CD, test_df_CD$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)>1800)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub(">1800", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<30)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<30", m_UC, test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>1800)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">1800", m_UC, test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>3600)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">3600", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+quantile(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE)), probs=c(0.5, 0.25, 0.75))
+
+ p1 <-  ggplot(test_df_CD)+
+    geom_histogram(aes(x=as.numeric(VALUE)), bins=30) + theme_classic()+ylab("Count") + xlab("F-cal")
+ p2 <-  ggplot(test_df_CD)+
+    geom_histogram(aes(x=log(as.numeric(VALUE)+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("F-cal - log transformed")
+  
+ p3 <-  ggplot(test_df_UC)+
+    geom_histogram(aes(x=as.numeric(VALUE)), bins=30)+ theme_classic()+ylab("Count") + xlab("F-cal")
+ p4 <-  ggplot(test_df_UC)+
+    geom_histogram(aes(x=log(as.numeric(VALUE)+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("F-cal - log transformed")
+ 
+ ggarrange(p1, p2)
+ ggarrange(p3, p4)
+ 
+ ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("F-cal - log transformed")
+  
+#Transform when necessary -> make a new column (measure_transformed)
+test_df_CD$measure_transformed <- log(as.numeric(test_df_CD$VALUE)+1)
+test_df_UC$measure_transformed <- log(as.numeric(test_df_UC$VALUE)+1)
+
+#Remove outliers
+  m_UC <- mean(test_df_UC$measure_transformed, na.rm = T)
+  sd_UC <- sd(test_df_UC$measure_transformed, na.rm=T)
+  outliers_UC <- 0
+  
+  m_CD <- mean(test_df_CD$measure_transformed, na.rm = T)
+  sd_CD <- sd(test_df_CD$measure_transformed, na.rm = T)
+  outliers_CD <- 0
+
+  for (i in dim(test_df_UC)[1]){
+   val <- test_df_UC[i, "measure_transformed"]
+   
+   if(val > m_UC+3*sd_UC | val < m_UC-3*sd_UC){
+      test_df_UC[i, "measure_transformed"] <- NA
+      outliers_UC <- outliers_UC +1
+   }
+  }
+  
+  for (i in dim(test_df_CD)[1]){
+   val <- test_df_CD[i, "measure_transformed"]
+   
+   if(val > m_CD+3*sd_CD | val < m_CD-3*sd_CD){
+      test_df_CD[i, "measure_transformed"] <- NA
+      outliers_CD <- outliers_CD +1
+   }
+    }
+
+```
+
+
+For each feature, run a linear mixed effects model:
+```{r}
+df_CD <- test_df_CD %>% filter(!is.na(measure_transformed))
+df_UC <- test_df_UC %>% filter(!is.na(measure_transformed))
+rm(test_df_CD, test_df_UC)
+
+#Overview of data
+df_CD <- df_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+df_UC <- df_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+summary(df_UC %>% filter(IBD == "UC"))
+dim(df_UC %>% filter(IBD == "UC", C_KON == "K"))[1]/dim(df_UC %>% filter(IBD == "UC"))[1]
+summary(df_UC %>% filter(IBD == "Control"))
+dim(df_UC %>% filter(IBD == "Control", C_KON == "K"))[1]/dim(df_UC %>% filter(IBD == "Control"))[1]
+
+summary(df_CD %>% filter(IBD == "CD"))
+dim(df_CD %>% filter(IBD == "CD", C_KON == "K"))[1]/dim(df_CD %>% filter(IBD == "CD"))[1]
+summary(df_CD %>% filter(IBD == "Control"))
+dim(df_CD %>% filter(IBD == "Control", C_KON == "K"))[1]/dim(df_CD %>% filter(IBD == "Control"))[1]
+
+#Run model and extract results - CD
+  
+  #Turn the model
+  df_CD$time2 <- -df_CD$sampling_to_diag
+  f1 <- lmer(measure_transformed~  + C_KON + age + IBD * time2 + (1|lbnr)+(1|LABORATORIUM_IDCODE), data = df_CD)
+  summary(f1)
+  
+    #QQ plot
+  qqnorm(residuals(f1))
+    
+    #Residuals
+  plot(f1)
+  
+    #Histogram
+  ggplot()+
+  geom_histogram(aes(x=residuals(f1)), bins=30)
+
+  
+#Run model and extract results - UC
+  
+  #Turn the model
+  df_UC$time2 <- -df_UC$sampling_to_diag
+  f1 <- lmer(measure_transformed~  + C_KON + age + IBD * time2 + (1|lbnr)+(1|LABORATORIUM_IDCODE), data = df_UC)
+  summary(f1)
+  
+    #QQ plot
+  qqnorm(residuals(f1))
+    
+    #Residuals
+  plot(f1)
+  
+    #Histogram
+  ggplot()+
+  geom_histogram(aes(x=residuals(f1)), bins=30)
+```
+
+
+Split into time intervals and test the association for each interval using LMM
+LMM / time interval / feature:
+```{r}
+#CD:
+# Add time interval column
+max(df_CD$sampling_to_diag)/365.25
+df_CD <- df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3,4))))
+
+# For each time interval!
+res_CD <- data.frame()
+for (i in 1:4){
+    df_sub <- df_CD %>% filter(time_interval == i)
+    form_CD <- "measure_transformed~ C_KON + age + IBD + (1|lbnr)+(1|LABORATORIUM_IDCODE)" 
+    
+    f_CD <- lmer(form_CD, data=df_sub)
+    
+    print(summary(f_CD))
+    ci <- confint(f_CD, parm = "IBDCD")
+    print(ci)
+    
+    #Make result table
+    tab <- summary(f_CD)
+    res_sub <- data.frame(t(tab$coefficients["IBDCD",]))
+    res_sub$time_interval <- i
+    res_sub$ci1 <- ci[1]
+    res_sub$ci2 <- ci[2]
+    res_CD <- rbind(res_CD, res_sub)
+    
+}
+colnames(res_CD)[1:5] <- c("Estimate", "SE", "df", "t_value", "p_value")
+res_CD
+write.table(res_CD, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Fcal_restable_CD_onlyGP.txt", quote=F, row.names=F)
+
+p <- ggplot(data=df_CD)+
+    geom_boxplot(aes(x=as.factor(time_interval), y=measure_transformed, color=IBD))+
+    ggtitle("Crohn's Disease: Feacal calprotectin")+theme_classic()+xlab("Years before diagnosis")+ylab("Measure (log transformed)")
+
+
+# UC:
+# Add time interval column
+max(df_UC$sampling_to_diag)/365.25
+df_UC <- df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4,5)))))
+
+# For each time interval!
+res_UC <- data.frame()
+for (i in 1:5){
+    df_sub <- df_UC %>% filter(time_interval == i)
+    form_UC <- "measure_transformed~ C_KON + age + IBD + (1|lbnr)+(1|LABORATORIUM_IDCODE)" 
+    
+    if(i %in% 1:3){
+      f_UC <- lmer(form_UC, data=df_sub)
+    } else{
+      f_UC <- lmer(form_UC, data=df_sub, control = lmerControl(optimizer = "bobyqa"))
+    }
+    
+    
+    print(summary(f_UC))
+    ci <- confint(f_UC, parm = "IBDUC")
+    print(ci)
+    
+    #Make result table
+    tab <- summary(f_UC)
+    res_sub <- data.frame(t(tab$coefficients["IBDUC",]))
+    res_sub$time_interval <- i
+    res_sub$ci1 <- ci[1]
+    res_sub$ci2 <- ci[2]
+    res_UC <- rbind(res_UC, res_sub)
+}
+
+colnames(res_UC)[1:5] <- c("Estimate", "SE", "df", "t_value", "p_value")
+res_UC
+write.table(res_UC, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Fcal_restable_UC_onlyGP.txt", quote=F, row.names=F)
+
+q <- ggplot(data=df_UC %>% filter(!time_interval==5))+
+    geom_boxplot(aes(x=as.factor(time_interval), y=measure_transformed, color=IBD))+
+    ggtitle("Ulcerative colitis: Feacal calprotectin")+theme_classic()+xlab("Years before diagnosis")+ylab("Measure (log transformed)")
+
+ggarrange(p, q)
+```
+
+Sensitivity: Running the models only including one time point pr. case person:
+```{r}
+library(data.table)
+#CD:
+# Add time interval column
+
+# For each time interval!
+res_CD <- data.frame()
+for (i in 1:4){
+    #Subset dataframe:
+    df_sub <- df_CD %>% filter(time_interval == i)
+    df_case <- df_sub %>% filter(IBD=="CD")
+    df_control <- df_sub %>% filter(IBD != "CD")
+    df_case <- df_case[!duplicated(df_case$lbnr),]
+    df_control <- data.table(df_control)
+    df_control <- df_control[, head(.SD, 5), by="corresponding_case"]
+    df_sub <- rbind(df_case, df_control)
+    
+    form_CD <- "measure_transformed~ C_KON + age + IBD+(1|LABORATORIUM_IDCODE)" 
+    
+    f_CD <- lmer(form_CD, data=df_sub)
+    ci <- confint(f_CD, parm = "IBDCD")
+    
+    #Make result table
+    tab <- summary(f_CD)
+    res_sub <- data.frame(t(tab$coefficients["IBDCD",]))
+    res_sub$time_interval <- i
+    res_sub$ci1 <- ci[1]
+    res_sub$ci2 <- ci[2]
+    res_sub$n_cases <- dim(df_case)[1]
+    res_sub$n_controls <- dim(df_control)[1]
+    res_CD <- rbind(res_CD, res_sub)
+}
+
+colnames(res_CD)[1:5] <- c("Estimate", "SE", "df", "t_value", "p_value")
+res_CD
+write.table(res_CD, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Fcal_restable_CD_onlyGP.txt", quote=F, row.names=F)
+
+# UC:
+# For each time interval!
+res_UC <- data.frame()
+for (i in 1:4){
+    df_sub <- df_UC %>% filter(time_interval == i)
+    df_case <- df_sub %>% filter(IBD=="UC")
+    df_control <- df_sub %>% filter(IBD != "UC")
+    df_case <- df_case[!duplicated(df_case$lbnr),]
+    df_control <- data.table(df_control)
+    df_control <- df_control[, head(.SD, 5), by="corresponding_case"]
+    df_sub <- rbind(df_case, df_control)
+    
+    form_UC <- "measure_transformed~ C_KON + age + IBD+(1|LABORATORIUM_IDCODE)" 
+    
+    f_UC <- lmer(form_UC, data=df_sub)
+    ci <- confint(f_UC, parm = "IBDUC")
+    
+    #Make result table
+    tab <- summary(f_UC)
+    res_sub <- data.frame(t(tab$coefficients["IBDUC",]))
+    res_sub$time_interval <- i
+    res_sub$ci1 <- ci[1]
+    res_sub$ci2 <- ci[2]
+    res_sub$n_cases <- dim(df_case)[1]
+    res_sub$n_controls <- dim(df_control)[1]
+    res_UC <- rbind(res_UC, res_sub)
+}
+
+colnames(res_UC)[1:5] <- c("Estimate", "SE", "df", "t_value", "p_value")
+res_UC
+write.table(res_UC, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Fcal_restable_UC_onlyGP.txt", quote=F, row.names=F)
+```
+
+
+Fit CD vs. UC:
+```{r}
+res_total <- rbind(df_CD %>% filter(IBD == "CD"), df_UC %>% filter(IBD == "UC"))
+
+f1 <- lmer(measure_transformed~  + C_KON + age + IBD * time2 + (1|lbnr)+(1|LABORATORIUM_IDCODE), data = res_total)
+summary(f1)
+  
+#In time intervals:
+res <- data.frame()
+for (i in 1:11){
+    df_sub <- res_total %>% filter(time_interval == i)
+    form_UC <- "measure_transformed~ C_KON + age + IBD + (1|lbnr)+(1|LABORATORIUM_IDCODE)" 
+    
+    f_UC <- lmer(form_UC, data=df_sub)
+    
+    print(summary(f_UC))
+    ci <- confint(f_UC, parm = "IBDUC")
+    print(ci)
+    
+    #Make result table
+    tab <- summary(f_UC)
+    res_sub <- data.frame(t(tab$coefficients["IBDUC",]))
+    res_sub$time_interval <- i
+    res_sub$ci1 <- ci[1]
+    res_sub$ci2 <- ci[2]
+    res <- rbind(res, res_sub)
+}
+
+colnames(res)[1:5] <- c("Estimate", "SE", "df", "t_value", "p_value")
+res
+write.table(res, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Fcal_UC_vs_CD_onlyGP.txt", quote=F, row.names=F)
+```
+
+## Sensitivity analysis: 2 IBD diagnoses
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Sensitivity_F_cal_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Sensitivity_F_cal_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD_reg2 = fct_relevel(IBD_reg2, "Control", "CD"))
+```
+
+
+Check normality of the features and remove outliers:
+```{r}
+sum(test_df_CD$VALUE == "<30" | test_df_CD$VALUE == ">1800") / dim(test_df_CD)[1]
+sum(test_df_UC$VALUE == "<30" | test_df_UC$VALUE == ">1800")/ dim(test_df_UC)[1]
+
+# Change til median value
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<30)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<30", m_CD, test_df_CD$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)>1800)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub(">1800", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<30)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<30", m_UC, test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>1800)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">1800", m_UC, test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>3600)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">3600", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+  ggplot(test_df_CD)+
+    geom_histogram(aes(x=as.numeric(VALUE)), bins=30)
+  ggplot(test_df_CD)+
+    geom_histogram(aes(x=log(as.numeric(VALUE)+1)), bins=30)
+  
+  ggplot(test_df_UC)+
+    geom_histogram(aes(x=as.numeric(VALUE)), bins=30)
+  ggplot(test_df_UC)+
+    geom_histogram(aes(x=log(as.numeric(VALUE)+1)), bins=30)
+  
+#Transform when necessary -> make a new column (measure_transformed)
+test_df_CD$measure_transformed <- log(as.numeric(test_df_CD$VALUE)+1)
+test_df_UC$measure_transformed <- log(as.numeric(test_df_UC$VALUE)+1)
+
+df_CD <- test_df_CD %>% filter(!is.na(measure_transformed))
+df_UC <- test_df_UC %>% filter(!is.na(measure_transformed))
+rm(test_df_CD, test_df_UC)
+
+df_CD <- df_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+df_UC <- df_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+```
+
+Split into time intervals and test the association for each interval using LMM
+LMM / time interval / feature:
+```{r}
+#CD:
+# Add time interval column
+max(df_CD$sampling_to_diag)/365.25
+df_CD <- df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3,4))))
+
+# For each time interval!
+res_CD <- data.frame()
+for (i in 1:4){
+    df_sub <- df_CD %>% filter(time_interval == i)
+    form_CD <- "measure_transformed~ C_KON + age + IBD_reg2 + (1|lbnr)+(1|LABORATORIUM_IDCODE)" 
+    
+    f_CD <- lmer(form_CD, data=df_sub)
+    
+    print(summary(f_CD))
+    ci <- confint(f_CD, parm = "IBD_reg2CD")
+    print(ci)
+    
+    #Make result table
+    tab <- summary(f_CD)
+    res_sub <- data.frame(t(tab$coefficients["IBD_reg2CD",]))
+    res_sub$time_interval <- i
+    res_sub$ci1 <- ci[1]
+    res_sub$ci2 <- ci[2]
+    res_CD <- rbind(res_CD, res_sub)
+    
+}
+colnames(res_CD)[1:5] <- c("Estimate", "SE", "df", "t_value", "p_value")
+res_CD
+write.table(res_CD, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Fcal_restable_CD_onlyGP.txt", quote=F, row.names=F)
+
+
+# UC:
+# Add time interval column
+max(df_UC$sampling_to_diag)/365.25
+df_UC <- df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4,5)))))
+
+# For each time interval!
+res_UC <- data.frame()
+for (i in 1:5){
+    df_sub <- df_UC %>% filter(time_interval == i)
+    form_UC <- "measure_transformed~ C_KON + age + IBD_reg2 + (1|lbnr)+(1|LABORATORIUM_IDCODE)" 
+    
+    f_UC <- lmer(form_UC, data=df_sub)
+    
+    print(summary(f_UC))
+    ci <- confint(f_UC, parm = "IBD_reg2UC")
+    print(ci)
+    
+    #Make result table
+    tab <- summary(f_UC)
+    res_sub <- data.frame(t(tab$coefficients["IBD_reg2UC",]))
+    res_sub$time_interval <- i
+    res_sub$ci1 <- ci[1]
+    res_sub$ci2 <- ci[2]
+    res_UC <- rbind(res_UC, res_sub)
+}
+
+colnames(res_UC)[1:5] <- c("Estimate", "SE", "df", "t_value", "p_value")
+res_UC
+write.table(res_UC, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Fcal_restable_UC_onlyGP.txt", quote=F, row.names=F)
+```
+
+## Co-morbidities sensitivty analysis:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/F_cal_CD_comorb_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/F_cal_UC_comorb_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+```
+
+
+Check normality of the features and remove outliers:
+```{r}
+# Change til median value
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<30)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<30", m_CD, test_df_CD$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)>1800)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub(">1800", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<30)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<30", m_UC, test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>1800)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">1800", m_UC, test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>3600)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">3600", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+  
+#Transform when necessary -> make a new column (measure_transformed)
+test_df_CD$measure_transformed <- log(as.numeric(test_df_CD$VALUE)+1)
+test_df_UC$measure_transformed <- log(as.numeric(test_df_UC$VALUE)+1)
+  
+# Investigate covariates in the two cohorts (for each NPU)
+CD_cases <- test_df_CD %>% filter(IBD == "CD")
+CD_controls <- test_df_CD %>% filter(IBD != "CD")
+UC_cases <- test_df_UC %>% filter(IBD == "UC")
+UC_controls <- test_df_UC %>% filter(IBD != "UC")
+
+summary(CD_cases)
+summary(CD_controls)
+summary(UC_cases)
+summary(UC_controls)
+rm(CD_cases, CD_controls, UC_cases, UC_controls)
+
+df_CD <- test_df_CD %>% filter(!is.na(measure_transformed))
+df_UC <- test_df_UC %>% filter(!is.na(measure_transformed))
+rm(test_df_CD, test_df_UC)
+
+df_CD <- df_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+df_UC <- df_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+```
+
+
+Split into time intervals and test the association for each interval using LMM
+LMM / time interval / feature:
+```{r}
+#CD:
+# Add time interval column
+df_CD <- df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3,4))))
+
+# For each time interval!
+res_CD <- data.frame()
+for (i in 1:4){
+    df_sub <- df_CD %>% filter(time_interval == i)
+    form_CD <- "measure_transformed~ C_KON + age + comorb_score + IBD + (1|lbnr)+(1|LABORATORIUM_IDCODE)" 
+    
+    f_CD <- lmer(form_CD, data=df_sub)
+    
+    print(summary(f_CD))
+    ci <- confint(f_CD, parm = "IBDCD")
+    print(ci)
+    
+    #Make result table
+    tab <- summary(f_CD)
+    res_sub <- data.frame(t(tab$coefficients["IBDCD",]))
+    res_sub$time_interval <- i
+    res_sub$ci1 <- ci[1]
+    res_sub$ci2 <- ci[2]
+    res_CD <- rbind(res_CD, res_sub)
+    
+}
+colnames(res_CD)[1:5] <- c("Estimate", "SE", "df", "t_value", "p_value")
+res_CD
+write.table(res_CD, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Fcal_restable_CD_comorb_onlyGP.txt", quote=F, row.names=F)
+
+# UC:
+# Add time interval column
+df_UC <- df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4,5)))))
+
+# For each time interval!
+res_UC <- data.frame()
+for (i in 1:5){
+    df_sub <- df_UC %>% filter(time_interval == i)
+    form_UC <- "measure_transformed~ C_KON + age + comorb_score + IBD + (1|lbnr)+(1|LABORATORIUM_IDCODE)" 
+    
+    f_UC <- lmer(form_UC, data=df_sub)
+    
+    print(summary(f_UC))
+    ci <- confint(f_UC, parm = "IBDUC")
+    print(ci)
+    
+    #Make result table
+    tab <- summary(f_UC)
+    res_sub <- data.frame(t(tab$coefficients["IBDUC",]))
+    res_sub$time_interval <- i
+    res_sub$ci1 <- ci[1]
+    res_sub$ci2 <- ci[2]
+    res_UC <- rbind(res_UC, res_sub)
+}
+
+colnames(res_UC)[1:5] <- c("Estimate", "SE", "df", "t_value", "p_value")
+res_UC
+write.table(res_UC, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Fcal_restable_UC_comorb_onlyGP.txt", quote=F, row.names=F)
+```

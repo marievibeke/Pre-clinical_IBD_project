@@ -1,0 +1,69 @@
+---
+title: "Untitled"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Read in packages:
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(DBI)
+library(odbc)
+library(haven)
+library(lubridate)
+```
+
+
+To read in datasets:
+```{r}
+#Etablering af forbindelse fra R til database.
+con <- dbConnect(odbc(), "Forskerdatabase")
+
+```
+
+Prepare support data:
+```{r}
+#All IBD patients
+diag_IBD <- read_sas("F:/Projekter/FSEID00001565/Data/Prepared_basefiles/ibd_diags.sas7bdat")
+
+# IBD patients based on two diagnoses
+diag_two <- read_sas("F:/Projekter/FSEID00001565/Data/Prepared_basefiles/ibd_patients_two_registrations.sas7bdat")
+
+#Keep only the first diagnosis of each patient:
+diag_IBD <- diag_IBD %>% group_by(lbnr) %>% slice(which.min(D_inddto))
+
+#Add information on living in DK one year before diagnosis:
+adress <- read_sas("F:/Projekter/FSEID00001565/Data/Prepared_basefiles/addresses.sas7bdat")
+adress <- adress %>% filter(Place == "Oth")
+test <- merge(diag_IBD, adress, by.x="lbnr", by.y="lbnr")
+test <- test %>% filter(D_fraflyt_dato <= D_inddto & D_fraflyt_dato >= D_inddto-365.25)
+diag_IBD$In_DK <- ifelse(diag_IBD$lbnr %in% test$lbnr, 0, 1)
+table(diag_IBD$In_DK)
+
+#Add information for sensitivity analysis: two diagnoses?, date of 2nd IBD registration, date of first ever IBD, IBD diagnosis 2
+d2 <- diag_two %>% select(lbnr,IBD_specific, d_IBD_diag_reg2, d_first_IBD_contact, IBD_reg2)
+diag_IBD <- merge(diag_IBD, d2, by.x="lbnr", by.y="lbnr")
+rm(d2)
+diag_IBD <- diag_IBD %>% select(-C_pattype, -C_indm, -V_recnum)
+
+#Who has died, emigrated or disappeared and when?
+cpr_reg <- read_sas("F:/Projekter/FSEID00001565/InputData/cpr3_t_person_lbnr.sas7bdat")
+dar <- cpr_reg %>% filter(C_STATUS %in% c(70, 80, 90))
+colnames(dar)[5] <- "date_of_death"
+dar <- dar %>% select(date_of_death, lbnr)
+
+#Who are living in Greenland?
+cpr_reg$greenland <- ifelse(cpr_reg$C_STATUS == "05", 1, 0)
+
+#Save also birthdays and gender:
+cpr_reg <- cpr_reg  %>% select(lbnr, D_FODDATO, C_KON, greenland)
+
+#Save these for analysis:
+write.table(diag_IBD, file="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/temp/IBD_diagnoses.txt")
+write.table(dar, file="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/temp/Death_times.txt")
+write.table(cpr_reg, file="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/temp/Birth_and_gender.txt")
+```
+

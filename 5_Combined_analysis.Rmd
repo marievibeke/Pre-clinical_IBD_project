@@ -1,0 +1,2017 @@
+---
+title: "Untitled"
+output: html_document
+date: '2022-07-27'
+editor_options: 
+  chunk_output_type: console
+---
+
+Load packages:
+```{r}
+library(ggplot2)
+library(dplyr)
+library(odbc)
+library(haven)
+library(lubridate)
+library(ggpubr)
+
+library(caret)
+library(randomForest)
+library(ROCR)
+library(pROC)
+library(scales)
+```
+
+Interesting features according to statistical analysis: CRP, neutrocytes, monocytes, platelets, hemoglobin, eosinophils and albumin. 
+
+Check number of samples with all 5-7 features for each time intervals:
+```{r}
+crp_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/CRP_CD_onlyGP.txt", sep=" ")
+neutro_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Neutrophilocytes2_CD_onlyGP.txt", sep=" ")
+mono_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Monocytes_CD_onlyGP.txt", sep=" ")
+throm_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Thrombocytes_CD_onlyGP.txt", sep=" ")
+hemo_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Hemoglobin_CD_onlyGP.txt", sep=" ")
+eos_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Eosinophiles1_CD_onlyGP.txt", sep=" ")
+alb_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Albumin1_CD_onlyGP.txt", sep=" ")
+
+
+crp_CD <- crp_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+neutro_CD <- neutro_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+mono_CD <- mono_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+throm_CD <- throm_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+hemo_CD <- hemo_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+eos_CD <- eos_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+alb_CD <- alb_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+crp_1 <- crp_CD %>% filter(time_interval==1 & IBD == "CD")
+crp_2 <- crp_CD %>% filter(time_interval==2 & IBD == "CD")
+crp_3 <- crp_CD %>% filter(time_interval==3 & IBD == "CD")
+crp_4 <- crp_CD %>% filter(time_interval==4 & IBD == "CD")
+crp_5 <- crp_CD %>% filter(time_interval==5 & IBD == "CD")
+crp_6 <- crp_CD %>% filter(time_interval==6 & IBD == "CD")
+crp_7 <- crp_CD %>% filter(time_interval==7 & IBD == "CD")
+crp_8 <- crp_CD %>% filter(time_interval==8 & IBD == "CD")
+crp_9 <- crp_CD %>% filter(time_interval==9 & IBD == "CD")
+rm(crp_CD)
+
+neutro_1 <- neutro_CD %>% filter(time_interval==1 & IBD == "CD")
+neutro_2 <- neutro_CD %>% filter(time_interval==2 & IBD == "CD")
+neutro_3 <- neutro_CD %>% filter(time_interval==3 & IBD == "CD")
+neutro_4 <- neutro_CD %>% filter(time_interval==4 & IBD == "CD")
+neutro_5 <- neutro_CD %>% filter(time_interval==5 & IBD == "CD")
+neutro_6 <- neutro_CD %>% filter(time_interval==6 & IBD == "CD")
+neutro_7 <- neutro_CD %>% filter(time_interval==7 & IBD == "CD")
+neutro_8 <- neutro_CD %>% filter(time_interval==8 & IBD == "CD")
+neutro_9 <- neutro_CD %>% filter(time_interval==9 & IBD == "CD")
+rm(neutro_CD)
+
+mono_1 <- mono_CD %>% filter(time_interval==1 & IBD == "CD")
+mono_2 <- mono_CD %>% filter(time_interval==2 & IBD == "CD")
+mono_3 <- mono_CD %>% filter(time_interval==3 & IBD == "CD")
+mono_4 <- mono_CD %>% filter(time_interval==4 & IBD == "CD")
+mono_5 <- mono_CD %>% filter(time_interval==5 & IBD == "CD")
+mono_6 <- mono_CD %>% filter(time_interval==6 & IBD == "CD")
+mono_7 <- mono_CD %>% filter(time_interval==7 & IBD == "CD")
+mono_8 <- mono_CD %>% filter(time_interval==8 & IBD == "CD")
+mono_9 <- mono_CD %>% filter(time_interval==9 & IBD == "CD")
+rm(mono_CD)
+
+throm_1 <- throm_CD %>% filter(time_interval==1 & IBD == "CD")
+throm_2 <- throm_CD %>% filter(time_interval==2 & IBD == "CD")
+throm_3 <- throm_CD %>% filter(time_interval==3 & IBD == "CD")
+throm_4 <- throm_CD %>% filter(time_interval==4 & IBD == "CD")
+throm_5 <- throm_CD %>% filter(time_interval==5 & IBD == "CD")
+throm_6 <- throm_CD %>% filter(time_interval==6 & IBD == "CD")
+throm_7 <- throm_CD %>% filter(time_interval==7 & IBD == "CD")
+throm_8 <- throm_CD %>% filter(time_interval==8 & IBD == "CD")
+throm_9 <- throm_CD %>% filter(time_interval==9 & IBD == "CD")
+rm(throm_CD)
+
+hemo_1 <- hemo_CD %>% filter(time_interval==1 & IBD == "CD")
+hemo_2 <- hemo_CD %>% filter(time_interval==2 & IBD == "CD")
+hemo_3 <- hemo_CD %>% filter(time_interval==3 & IBD == "CD")
+hemo_4 <- hemo_CD %>% filter(time_interval==4 & IBD == "CD")
+hemo_5 <- hemo_CD %>% filter(time_interval==5 & IBD == "CD")
+hemo_6 <- hemo_CD %>% filter(time_interval==6 & IBD == "CD")
+hemo_7 <- hemo_CD %>% filter(time_interval==7 & IBD == "CD")
+hemo_8 <- hemo_CD %>% filter(time_interval==8 & IBD == "CD")
+hemo_9 <- hemo_CD %>% filter(time_interval==9 & IBD == "CD")
+rm(hemo_CD)
+
+eos_1 <- eos_CD %>% filter(time_interval==1 & IBD == "CD")
+eos_2 <- eos_CD %>% filter(time_interval==2 & IBD == "CD")
+eos_3 <- eos_CD %>% filter(time_interval==3 & IBD == "CD")
+eos_4 <- eos_CD %>% filter(time_interval==4 & IBD == "CD")
+eos_5 <- eos_CD %>% filter(time_interval==5 & IBD == "CD")
+eos_6 <- eos_CD %>% filter(time_interval==6 & IBD == "CD")
+eos_7 <- eos_CD %>% filter(time_interval==7 & IBD == "CD")
+eos_8 <- eos_CD %>% filter(time_interval==8 & IBD == "CD")
+eos_9 <- eos_CD %>% filter(time_interval==9 & IBD == "CD")
+rm(eos_CD)
+
+alb_1 <- alb_CD %>% filter(time_interval==1 & IBD == "CD")
+alb_2 <- alb_CD %>% filter(time_interval==2 & IBD == "CD")
+alb_3 <- alb_CD %>% filter(time_interval==3 & IBD == "CD")
+alb_4 <- alb_CD %>% filter(time_interval==4 & IBD == "CD")
+alb_5 <- alb_CD %>% filter(time_interval==5 & IBD == "CD")
+alb_6 <- alb_CD %>% filter(time_interval==6 & IBD == "CD")
+alb_7 <- alb_CD %>% filter(time_interval==7 & IBD == "CD")
+alb_8 <- alb_CD %>% filter(time_interval==8 & IBD == "CD")
+alb_9 <- alb_CD %>% filter(time_interval==9 & IBD == "CD")
+rm(alb_CD)
+
+#How many lbnr (person IDs) do they have in common?
+length(Reduce(intersect, list(crp_1$lbnr, neutro_1$lbnr, mono_1$lbnr, throm_1$lbnr, hemo_1$lbnr)))
+length(Reduce(intersect, list(crp_1$lbnr, neutro_1$lbnr, mono_1$lbnr, throm_1$lbnr, hemo_1$lbnr, eos_1$lbnr)))
+length(Reduce(intersect, list(crp_1$lbnr, neutro_1$lbnr, mono_1$lbnr, throm_1$lbnr, hemo_1$lbnr, eos_1$lbnr, alb_1$lbnr)))
+
+length(Reduce(intersect, list(crp_2$lbnr, neutro_2$lbnr, mono_2$lbnr, throm_2$lbnr, hemo_2$lbnr)))
+length(Reduce(intersect, list(crp_2$lbnr, neutro_2$lbnr, mono_2$lbnr, throm_2$lbnr, hemo_2$lbnr, eos_2$lbnr)))
+length(Reduce(intersect, list(crp_2$lbnr, neutro_2$lbnr, mono_2$lbnr, throm_2$lbnr, hemo_2$lbnr, eos_2$lbnr, alb_2$lbnr)))
+
+length(Reduce(intersect, list(crp_3$lbnr, neutro_3$lbnr, mono_3$lbnr, throm_3$lbnr, hemo_3$lbnr)))
+length(Reduce(intersect, list(crp_3$lbnr, neutro_3$lbnr, mono_3$lbnr, throm_3$lbnr, hemo_3$lbnr, eos_3$lbnr)))
+length(Reduce(intersect, list(crp_3$lbnr, neutro_3$lbnr, mono_3$lbnr, throm_3$lbnr, hemo_3$lbnr, eos_3$lbnr, alb_3$lbnr)))
+
+length(Reduce(intersect, list(crp_4$lbnr, neutro_4$lbnr, mono_4$lbnr, throm_4$lbnr, hemo_4$lbnr)))
+length(Reduce(intersect, list(crp_4$lbnr, neutro_4$lbnr, mono_4$lbnr, throm_4$lbnr, hemo_4$lbnr, eos_4$lbnr)))
+length(Reduce(intersect, list(crp_4$lbnr, neutro_4$lbnr, mono_4$lbnr, throm_4$lbnr, hemo_4$lbnr, eos_4$lbnr, alb_4$lbnr)))
+
+length(Reduce(intersect, list(crp_5$lbnr, neutro_5$lbnr, mono_5$lbnr, throm_5$lbnr, hemo_5$lbnr)))
+length(Reduce(intersect, list(crp_5$lbnr, neutro_5$lbnr, mono_5$lbnr, throm_5$lbnr, hemo_5$lbnr, eos_5$lbnr)))
+length(Reduce(intersect, list(crp_5$lbnr, neutro_5$lbnr, mono_5$lbnr, throm_5$lbnr, hemo_5$lbnr, eos_5$lbnr, alb_5$lbnr)))
+
+length(Reduce(intersect, list(crp_6$lbnr, neutro_6$lbnr, mono_6$lbnr, throm_6$lbnr, hemo_6$lbnr)))
+length(Reduce(intersect, list(crp_6$lbnr, neutro_6$lbnr, mono_6$lbnr, throm_6$lbnr, hemo_6$lbnr, eos_6$lbnr)))
+length(Reduce(intersect, list(crp_6$lbnr, neutro_6$lbnr, mono_6$lbnr, throm_6$lbnr, hemo_6$lbnr, eos_6$lbnr, alb_6$lbnr)))
+
+length(Reduce(intersect, list(crp_7$lbnr, neutro_7$lbnr, mono_7$lbnr, throm_7$lbnr, hemo_7$lbnr)))
+length(Reduce(intersect, list(crp_7$lbnr, neutro_7$lbnr, mono_7$lbnr, throm_7$lbnr, hemo_7$lbnr, eos_7$lbnr)))
+length(Reduce(intersect, list(crp_7$lbnr, neutro_7$lbnr, mono_7$lbnr, throm_7$lbnr, hemo_7$lbnr, eos_7$lbnr, alb_7$lbnr)))
+
+length(Reduce(intersect, list(crp_8$lbnr, neutro_8$lbnr, mono_8$lbnr, throm_8$lbnr, hemo_8$lbnr)))
+length(Reduce(intersect, list(crp_8$lbnr, neutro_8$lbnr, mono_8$lbnr, throm_8$lbnr, hemo_8$lbnr, eos_8$lbnr)))
+length(Reduce(intersect, list(crp_8$lbnr, neutro_8$lbnr, mono_8$lbnr, throm_8$lbnr, hemo_8$lbnr, eos_8$lbnr, alb_8$lbnr)))
+
+length(Reduce(intersect, list(crp_9$lbnr, neutro_9$lbnr, mono_9$lbnr, throm_9$lbnr, hemo_9$lbnr)))
+length(Reduce(intersect, list(crp_9$lbnr, neutro_9$lbnr, mono_9$lbnr, throm_9$lbnr, hemo_9$lbnr, eos_9$lbnr)))
+length(Reduce(intersect, list(crp_9$lbnr, neutro_9$lbnr, mono_9$lbnr, throm_9$lbnr, hemo_9$lbnr, eos_9$lbnr, alb_9$lbnr)))
+
+```
+
+We have decided to go with 6 features based on the number of available samples: CRP, neutro, mono, thrombo, hemo and eosino 
+
+#Matching: Match cases with all features in a time interval with a controls with all features in a time interval
+For CD:
+```{r}
+#Connection to database
+con <- dbConnect(odbc(), "Forskerdatabase")
+
+#Data frame with feature name and NPU code
+npus <- colnames(read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/NPU-koder.txt"))
+
+npu_df <- data.frame(name = c("F_cal", "CRP", "Hemoglobin", "Leukocytes", "Neutrophilocytes", "Lymphocytes", "Monocytes", "Basophiles", "Thrombocytes", "Iron", "VitB12", "Folate", "ALAT", "ASAT", "Bilirubin", "ESR2", "Eosinophiles1", "Albumin1", "Vitamin D1", "Neutrophilocytes2"), npu = c(npus[c(3,2,4,7:10, 13:14, 17:19)], "NPU19651", "NPU19654", "NPU01370", npus[c(6, 11, 15)], "NPU10267", "NPU02902"))
+
+#Select the 6 features
+npu_df <- npu_df %>% filter(name %in% c("Neutrophilocytes2", "Hemoglobin", "CRP", "Monocytes", "Thrombocytes", "Eosinophiles1"))
+rm(npus)
+npu_df$name <- factor(npu_df$name, levels = c("CRP", "Hemoglobin", "Neutrophilocytes2", "Monocytes", "Thrombocytes", "Eosinophiles1"))
+npu_df <- npu_df %>% arrange(name)
+
+#Read in other data frames
+pseudo_cpr <- read_sas("F:/Projekter/FSEID00001565/InputData/fseid00001565_lbnr_key.sas7bdat")
+colnames(pseudo_cpr)[1] <- "PATIENT_CPR_ENCRYPTED"
+
+dar <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/temp/Death_times.txt", sep= " ")
+
+cpr_reg <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/temp/Birth_and_gender.txt", sep= " ")
+
+diag1 <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/temp/IBD_diagnoses.txt", sep=" ")
+
+#Create empty dataframes:
+empty_df <- data.frame(lbnr = NA, LABORATORIUM_IDCODE = NA, SAMPLINGDATE= NA, D_FODDATO = NA, C_KON = NA, IBD = NA, crp = NA, hemo = NA, neutro = NA, mono = NA, throm = NA, eos = NA)
+
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_1_CD.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_2_CD.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_3_CD.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_4_CD.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_5_CD.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_6_CD.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_7_CD.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_8_CD.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_9_CD.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_10_CD.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_11_CD.txt", row.names = F)
+rm(empty_df)
+
+#Loop through 3 month time intervals for diagnosis:
+dates <- seq.Date(as.Date("2008/04/01"), as.Date("2018/12/30"), by="quarter")
+for (period in 1:length(dates)){
+  
+  #Find cases:
+  diag <- diag1 %>% filter(as.Date(D_inddto) <= dates[period] & as.Date(D_inddto) > dates[period] - months(3))
+  diag_old <- diag1 %>% filter(as.Date(D_inddto) <= dates[period] - months(3))
+
+  #Read in lab database, start with CRP:
+  lab_crp <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[1, "npu"], "'"))
+  
+  #Remove all samples after diagnosis date and keep only "ydernummer":
+  lab_crp <- lab_crp %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+
+  # Add lbnr
+  lab_crp <- left_join(lab_crp, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_crp <- lab_crp %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  
+  #Merge with IBD diagnoses
+  lab_crp <- left_join(lab_crp, diag, by="lbnr")
+
+  #Merge with death register
+  lab_crp <- left_join(lab_crp, dar, by="lbnr") 
+  
+  #Add birthday and sex
+  lab_crp <- left_join(lab_crp, cpr_reg, by="lbnr")
+
+  #Keep only those, that were in DK 1 year before diagnosis, remove those that live in Greenland, remove samples from people diagnosed before the period and those who dies/emigrates/disappeared before diagnosis time and transform + remove UC cases
+  lab_crp <- lab_crp %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "CD")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  
+  #Adjust VALUE
+  lab_crp$VALUE <- gsub(",", ".", lab_crp$VALUE)
+  sub_CD <- lab_crp %>% filter(as.numeric(VALUE)<4)
+  m_CD <- median(as.numeric(sub_CD$VALUE))
+  lab_crp$VALUE <- gsub("<4", m_CD, lab_crp$VALUE)
+  sub_CD <- lab_crp %>% filter(as.numeric(VALUE)>300)
+  m_CD <- median(as.numeric(sub_CD$VALUE))
+  lab_crp$VALUE <- gsub(">300", m_CD, lab_crp$VALUE)
+  rm(sub_CD)
+
+  #Divide into time intervals before diagnosis
+  lab_crp <- lab_crp %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("crp_", i), lab_crp %>% filter(time_interval==i))
+  }
+
+  #Prepare the other 5 databases
+  #2, hemoglobin:
+  lab_hemo <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[2, "npu"], "'"))
+  lab_hemo <- lab_hemo %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+  lab_hemo <- left_join(lab_hemo, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_hemo <- lab_hemo %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  lab_hemo <- left_join(lab_hemo, diag, by="lbnr")
+  lab_hemo <- left_join(lab_hemo, dar, by="lbnr") 
+  lab_hemo <- left_join(lab_hemo, cpr_reg, by="lbnr")
+  lab_hemo <- lab_hemo %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "CD")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  lab_hemo <- lab_hemo %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+  
+  #Adjust VALUE
+  lab_hemo$VALUE <- gsub(",", ".", lab_hemo$VALUE)
+  
+  #Find overlaps so far
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("hemo_", i), lab_hemo %>% filter(time_interval==i))
+    assign(paste0("common_", i), Reduce(intersect, list(eval(parse(text=paste0("crp_", i, "$lbnr"))), eval(parse(text=paste0("hemo_", i, "$lbnr"))))))
+    
+    assign(paste0("crp_", i), eval(parse(text=paste0("crp_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("hemo_", i), eval(parse(text=paste0("hemo_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+  }
+  rm(lab_hemo)
+  
+  #3, neutrophils:
+  lab_neutro <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[3, "npu"], "'"))
+  lab_neutro <- lab_neutro %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+  lab_neutro <- left_join(lab_neutro, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_neutro <- lab_neutro %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  lab_neutro <- left_join(lab_neutro, diag, by="lbnr")
+  lab_neutro <- left_join(lab_neutro, dar, by="lbnr") 
+  lab_neutro <- left_join(lab_neutro, cpr_reg, by="lbnr")
+  lab_neutro <- lab_neutro %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "CD")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  lab_neutro <- lab_neutro %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+
+  #Adjust VALUE
+  lab_neutro$VALUE <- gsub(",", ".", lab_neutro$VALUE)
+
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("neutro_", i), lab_neutro %>% filter(time_interval==i))
+    assign(paste0("common_", i), Reduce(intersect, list(eval(parse(text=paste0("common_", i))), eval(parse(text=paste0("neutro_", i, "$lbnr"))))))
+    
+    assign(paste0("crp_", i), eval(parse(text=paste0("crp_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("hemo_", i), eval(parse(text=paste0("hemo_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("neutro_", i), eval(parse(text=paste0("neutro_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+  }
+  rm(lab_neutro)
+  
+  #4, monocytes:
+  lab_mono <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[4, "npu"], "'"))
+  lab_mono <- lab_mono %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+  lab_mono <- left_join(lab_mono, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_mono <- lab_mono %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  lab_mono <- left_join(lab_mono, diag, by="lbnr")
+  lab_mono <- left_join(lab_mono, dar, by="lbnr") 
+  lab_mono <- left_join(lab_mono, cpr_reg, by="lbnr")
+  lab_mono <- lab_mono %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "CD")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  lab_mono <- lab_mono %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+
+  lab_mono$VALUE <- gsub(",", ".", lab_mono$VALUE)
+  sub <- lab_mono %>% filter(as.numeric(VALUE)<0.02)
+  m_CD <- median(as.numeric(sub$VALUE))
+  lab_mono$VALUE <- gsub("<0.02", m_CD, lab_mono$VALUE)
+  rm(sub)
+
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("mono_", i), lab_mono %>% filter(time_interval==i))
+    assign(paste0("common_", i), Reduce(intersect, list(eval(parse(text=paste0("common_", i))), eval(parse(text=paste0("mono_", i, "$lbnr"))))))
+    
+    assign(paste0("crp_", i), eval(parse(text=paste0("crp_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("hemo_", i), eval(parse(text=paste0("hemo_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("neutro_", i), eval(parse(text=paste0("neutro_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("mono_", i), eval(parse(text=paste0("mono_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+  }
+  rm(lab_mono)
+  
+  #5, platelets:
+  lab_throm <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[5, "npu"], "'"))
+  lab_throm <- lab_throm %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+  lab_throm <- left_join(lab_throm, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_throm <- lab_throm %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  lab_throm <- left_join(lab_throm, diag, by="lbnr")
+  lab_throm <- left_join(lab_throm, dar, by="lbnr") 
+  lab_throm <- left_join(lab_throm, cpr_reg, by="lbnr")
+  lab_throm <- lab_throm %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "CD")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  lab_throm <- lab_throm %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+
+  sub <- lab_throm %>% filter(as.numeric(VALUE)<5)
+  m_CD <- median(as.numeric(sub$VALUE))
+  lab_throm$VALUE <- gsub("<5", m_CD, lab_throm$VALUE)
+  rm(sub)
+
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("throm_", i), lab_throm %>% filter(time_interval==i))
+    assign(paste0("common_", i), Reduce(intersect, list(eval(parse(text=paste0("common_", i))), eval(parse(text=paste0("throm_", i, "$lbnr"))))))
+    
+    assign(paste0("crp_", i), eval(parse(text=paste0("crp_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("hemo_", i), eval(parse(text=paste0("hemo_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("neutro_", i), eval(parse(text=paste0("neutro_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("mono_", i), eval(parse(text=paste0("mono_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("throm_", i), eval(parse(text=paste0("throm_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+  }
+  rm(lab_throm)
+  
+  #6, eosinophils:
+  lab_eos <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[6, "npu"], "'"))
+  lab_eos <- lab_eos %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+  lab_eos <- left_join(lab_eos, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_eos <- lab_eos %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  lab_eos <- left_join(lab_eos, diag, by="lbnr")
+  lab_eos <- left_join(lab_eos, dar, by="lbnr") 
+  lab_eos <- left_join(lab_eos, cpr_reg, by="lbnr")
+  lab_eos <- lab_eos %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "CD")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  lab_eos <- lab_eos %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+  
+  lab_eos$VALUE <- gsub(",", ".", lab_eos$VALUE)
+  sub <- lab_eos %>% filter(as.numeric(VALUE)<0.02)
+  m_CD <- median(as.numeric(sub$VALUE))
+  lab_eos$VALUE <- gsub("<0.02", m_CD, lab_eos$VALUE)
+  rm(sub)
+
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("eos_", i), lab_eos %>% filter(time_interval==i))
+    assign(paste0("common_", i), Reduce(intersect, list(eval(parse(text=paste0("common_", i))), eval(parse(text=paste0("eos_", i, "$lbnr"))))))
+    
+    assign(paste0("crp_", i), eval(parse(text=paste0("crp_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("hemo_", i), eval(parse(text=paste0("hemo_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("neutro_", i), eval(parse(text=paste0("neutro_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("mono_", i), eval(parse(text=paste0("mono_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("throm_", i), eval(parse(text=paste0("throm_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("eos_", i), eval(parse(text=paste0("eos_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+  }
+  rm(lab_eos, diag, diag_old)
+  
+  #Go through all time intervals and all cases
+  #Perform matching
+  
+  for (i in 1:max(lab_crp$time_interval)){
+    cases_crp <- eval(parse(text=paste0("crp_", i))) %>% filter(IBD == "CD")
+    controls_crp <- eval(parse(text=paste0("crp_", i))) %>% filter(is.na(IBD))
+    cases_hemo <- eval(parse(text=paste0("hemo_", i))) %>% filter(IBD == "CD")
+    controls_hemo <- eval(parse(text=paste0("hemo_", i))) %>% filter(is.na(IBD))
+    cases_neutro <- eval(parse(text=paste0("neutro_", i))) %>% filter(IBD == "CD")
+    controls_neutro <- eval(parse(text=paste0("neutro_", i))) %>% filter(is.na(IBD))
+    cases_mono <- eval(parse(text=paste0("mono_", i))) %>% filter(IBD == "CD")
+    controls_mono <- eval(parse(text=paste0("mono_", i))) %>% filter(is.na(IBD))
+    cases_throm <- eval(parse(text=paste0("throm_", i))) %>% filter(IBD == "CD")
+    controls_throm <- eval(parse(text=paste0("throm_", i))) %>% filter(is.na(IBD))
+    cases_eos <- eval(parse(text=paste0("eos_", i))) %>% filter(IBD == "CD")
+    controls_eos <- eval(parse(text=paste0("eos_", i))) %>% filter(is.na(IBD))
+    
+    #rm(eval(parse(text=paste0("crp_", i))), eval(parse(text=paste0("hemo_", i))), eval(parse(text=paste0("leuko_", i))), eval(parse(text=paste0("mono_", i))), eval(parse(text=paste0("throm_", i))))
+    
+    df_cases_controls <- data.frame()
+
+    for (j in unique(cases_crp$lbnr)){
+      ca_crp <- cases_crp %>% filter(lbnr == j)
+      ca_hemo <- cases_hemo %>% filter(lbnr == j)
+      ca_neutro <- cases_neutro %>% filter(lbnr == j)
+      ca_mono <- cases_mono %>% filter(lbnr == j)
+      ca_throm <- cases_throm %>% filter(lbnr == j)
+      ca_eos <- cases_eos %>% filter(lbnr == j)
+      
+      common_lab <- Reduce(intersect, list(ca_crp$LABORATORIUM_IDCODE, ca_hemo$LABORATORIUM_IDCODE, ca_neutro$LABORATORIUM_IDCODE, ca_mono$LABORATORIUM_IDCODE, ca_throm$LABORATORIUM_IDCODE, ca_eos$LABORATORIUM_IDCODE))
+      
+      if(length(common_lab)>0){
+        lab <- common_lab[1]
+      ca_crp <- ca_crp %>% filter(LABORATORIUM_IDCODE==lab)
+      co_crp <- controls_crp %>% filter(C_KON == ca_crp[1, "C_KON"] & D_FODDATO <= ca_crp[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_crp[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      ca_hemo <- ca_hemo %>% filter(LABORATORIUM_IDCODE==lab)
+      co_hemo <- controls_hemo %>% filter(C_KON == ca_hemo[1, "C_KON"] & D_FODDATO <= ca_hemo[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_hemo[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      ca_neutro <- ca_neutro %>% filter(LABORATORIUM_IDCODE==lab)
+      co_neutro <- controls_neutro %>% filter(C_KON == ca_neutro[1, "C_KON"] & D_FODDATO <= ca_neutro[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_neutro[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      ca_mono <- ca_mono %>% filter(LABORATORIUM_IDCODE==lab)
+      co_mono <- controls_mono %>% filter(C_KON == ca_mono[1, "C_KON"] & D_FODDATO <= ca_mono[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_mono[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      ca_throm <- ca_throm %>% filter(LABORATORIUM_IDCODE==lab)
+      co_throm <- controls_throm %>% filter(C_KON == ca_throm[1, "C_KON"] & D_FODDATO <= ca_throm[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_throm[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      ca_eos <- ca_eos %>% filter(LABORATORIUM_IDCODE==lab)
+      co_eos <- controls_eos %>% filter(C_KON == ca_eos[1, "C_KON"] & D_FODDATO <= ca_eos[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_eos[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      
+      common <- Reduce(intersect, list(co_crp$lbnr, co_hemo$lbnr, co_neutro$lbnr, co_mono$lbnr, co_throm$lbnr, co_eos$lbnr))
+      
+      if(length(common)>0){
+        
+        #Save case and control
+        df_cases_controls <- rbind(df_cases_controls, data.frame(lbnr = j, LABORATORIUM_IDCODE = lab, SAMPLINGDATE= median(ca_crp$SAMPLINGDATE), D_FODDATO = ca_crp[1, "D_FODDATO"], C_KON = ca_crp[1, "C_KON"], IBD = "CD", crp = median(as.numeric(ca_crp$VALUE)), hemo = median(as.numeric(ca_hemo$VALUE)), neutro = median(as.numeric(ca_neutro$VALUE)), mono = median(as.numeric(ca_mono$VALUE)), throm = median(as.numeric(ca_throm$VALUE)), eos = median(as.numeric(ca_eos$VALUE))))
+
+        common <- sample(common, 1)
+        co_crp <- co_crp %>% filter(lbnr==common)
+        co_hemo <- co_hemo %>% filter(lbnr==common)
+        co_neutro <- co_neutro %>% filter(lbnr==common)
+        co_mono <- co_mono %>% filter(lbnr==common)
+        co_throm <- co_throm %>% filter(lbnr==common)
+        co_eos <- co_eos %>% filter(lbnr==common)
+        
+        df_cases_controls <- rbind(df_cases_controls, data.frame(lbnr = common, LABORATORIUM_IDCODE = lab, SAMPLINGDATE= median(co_crp$SAMPLINGDATE), D_FODDATO = co_crp[1, "D_FODDATO"], C_KON = co_crp[1, "C_KON"], IBD = "Control", crp = median(as.numeric(co_crp$VALUE)), hemo = median(as.numeric(co_hemo$VALUE)), neutro = median(as.numeric(co_neutro$VALUE)), mono = median(as.numeric(co_mono$VALUE)), throm = median(as.numeric(co_throm$VALUE)), eos = median(as.numeric(co_eos$VALUE))))
+        
+      }
+      
+      rm(common, co_crp, co_hemo, co_neutro, co_mono, co_throm, co_eos)
+      }
+      rm(common_lab, ca_crp, ca_hemo, ca_neutro, ca_mono, ca_throm, ca_eos)
+    }
+    #Open data frame so far and add:
+      so_far <- read.csv(paste0("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_", i, "_CD.txt"))
+      so_far <- so_far %>% transform(SAMPLINGDATE =as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO))
+    so_far <- rbind(so_far, df_cases_controls)
+    
+    write.csv(so_far, paste0("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_", i, "_CD.txt"), row.names = F)
+    rm(so_far, df_cases_controls, lab_crp)
+  }
+}
+
+```
+
+
+For UC:
+```{r}
+#Connect to database.
+con <- dbConnect(odbc(), "Forskerdatabase")
+
+#Data frame with feature name and NPU code
+npus <- colnames(read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/NPU-koder.txt"))
+
+npu_df <- data.frame(name = c("F_cal", "CRP", "Hemoglobin", "Leukocytes", "Neutrophilocytes", "Lymphocytes", "Monocytes", "Basophiles", "Thrombocytes", "Iron", "VitB12", "Folate", "ALAT", "ASAT", "Bilirubin", "ESR2", "Eosinophiles1", "Albumin1", "Vitamin D1", "Neutrophilocytes2"), npu = c(npus[c(3,2,4,7:10, 13:14, 17:19)], "NPU19651", "NPU19654", "NPU01370", npus[c(6, 11, 15)], "NPU10267", "NPU02902"))
+
+#Select the six relevant
+npu_df <- npu_df %>% filter(name %in% c("Neutrophilocytes2", "Hemoglobin", "CRP", "Monocytes", "Thrombocytes", "Eosinophiles1"))
+rm(npus)
+npu_df$name <- factor(npu_df$name, levels = c("CRP", "Hemoglobin", "Neutrophilocytes2", "Monocytes", "Thrombocytes", "Eosinophiles1"))
+npu_df <- npu_df %>% arrange(name)
+
+#Read in data
+pseudo_cpr <- read_sas("F:/Projekter/FSEID00001565/InputData/fseid00001565_lbnr_key.sas7bdat")
+colnames(pseudo_cpr)[1] <- "PATIENT_CPR_ENCRYPTED"
+
+dar <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/temp/Death_times.txt", sep= " ")
+
+cpr_reg <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/temp/Birth_and_gender.txt", sep= " ")
+
+diag1 <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/temp/IBD_diagnoses.txt", sep=" ")
+
+#Create empty dataframes:
+empty_df <- data.frame(lbnr = NA, LABORATORIUM_IDCODE = NA, SAMPLINGDATE= NA, D_FODDATO = NA, C_KON = NA, IBD = NA, crp = NA, hemo = NA, neutro = NA, mono = NA, throm = NA, eos = NA)
+
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_1_UC.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_2_UC.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_3_UC.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_4_UC.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_5_UC.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_6_UC.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_7_UC.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_8_UC.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_9_UC.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_10_UC.txt", row.names = F)
+write.csv(empty_df, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_11_UC.txt", row.names = F)
+rm(empty_df)
+
+
+#Loop through 3 month time intervals for diagnosis:
+dates <- seq.Date(as.Date("2008/04/01"), as.Date("2018/12/30"), by="quarter")
+for (period in 1:length(dates)){
+  
+  #Find cases:
+  diag <- diag1 %>% filter(as.Date(D_inddto) <= dates[period] & as.Date(D_inddto) > dates[period] - months(3))
+  diag_old <- diag1 %>% filter(as.Date(D_inddto) <= dates[period] - months(3))
+
+  #Read in lab database, CRP:
+  lab_crp <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[1, "npu"], "'"))
+  
+  #Remove all samples after diagnosis date and keep only "ydernummer":
+  lab_crp <- lab_crp %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+
+  # Add lbnr
+  lab_crp <- left_join(lab_crp, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_crp <- lab_crp %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  
+  #Merge with IBD diagnoses
+  lab_crp <- left_join(lab_crp, diag, by="lbnr")
+
+  #Merge with death register
+  lab_crp <- left_join(lab_crp, dar, by="lbnr") 
+  
+  #Add birthday and sex
+  lab_crp <- left_join(lab_crp, cpr_reg, by="lbnr")
+
+  #Keep only those, that were in DK 1 year before diagnosis, remove those that live in Greenland, remove samples from people diagnosed before the period and those who dies/emigrates/disappeared before diagnosis time and transform + remove UC cases
+  lab_crp <- lab_crp %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "UC")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  
+  #Adjust VALUE
+  lab_crp$VALUE <- gsub(",", ".", lab_crp$VALUE)
+  sub_CD <- lab_crp %>% filter(as.numeric(VALUE)<4)
+  m_CD <- median(as.numeric(sub_CD$VALUE))
+  lab_crp$VALUE <- gsub("<4", m_CD, lab_crp$VALUE)
+  sub_CD <- lab_crp %>% filter(as.numeric(VALUE)>300)
+  m_CD <- median(as.numeric(sub_CD$VALUE))
+  lab_crp$VALUE <- gsub(">300", m_CD, lab_crp$VALUE)
+  rm(sub_CD)
+
+  #Divide into time intervals before diagnosis
+  lab_crp <- lab_crp %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("crp_", i), lab_crp %>% filter(time_interval==i))
+  }
+
+  #Prepare the other 5 databases
+  #2, hemoglobin:
+  lab_hemo <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[2, "npu"], "'"))
+  lab_hemo <- lab_hemo %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+  lab_hemo <- left_join(lab_hemo, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_hemo <- lab_hemo %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  lab_hemo <- left_join(lab_hemo, diag, by="lbnr")
+  lab_hemo <- left_join(lab_hemo, dar, by="lbnr") 
+  lab_hemo <- left_join(lab_hemo, cpr_reg, by="lbnr")
+  lab_hemo <- lab_hemo %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "UC")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  lab_hemo <- lab_hemo %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+  
+  #Adjust VALUE
+  lab_hemo$VALUE <- gsub(",", ".", lab_hemo$VALUE)
+  
+  #Find overlaps so far
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("hemo_", i), lab_hemo %>% filter(time_interval==i))
+    assign(paste0("common_", i), Reduce(intersect, list(eval(parse(text=paste0("crp_", i, "$lbnr"))), eval(parse(text=paste0("hemo_", i, "$lbnr"))))))
+    
+    assign(paste0("crp_", i), eval(parse(text=paste0("crp_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("hemo_", i), eval(parse(text=paste0("hemo_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+  }
+  rm(lab_hemo)
+  
+  #3, neutrophils:
+  lab_neutro <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[3, "npu"], "'"))
+  lab_neutro <- lab_neutro %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+  lab_neutro <- left_join(lab_neutro, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_neutro <- lab_neutro %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  lab_neutro <- left_join(lab_neutro, diag, by="lbnr")
+  lab_neutro <- left_join(lab_neutro, dar, by="lbnr") 
+  lab_neutro <- left_join(lab_neutro, cpr_reg, by="lbnr")
+  lab_neutro <- lab_neutro %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "UC")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  lab_neutro <- lab_neutro %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+
+  #Adjust VALUE
+  lab_neutro$VALUE <- gsub(",", ".", lab_neutro$VALUE)
+
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("neutro_", i), lab_neutro %>% filter(time_interval==i))
+    assign(paste0("common_", i), Reduce(intersect, list(eval(parse(text=paste0("common_", i))), eval(parse(text=paste0("neutro_", i, "$lbnr"))))))
+    
+    assign(paste0("crp_", i), eval(parse(text=paste0("crp_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("hemo_", i), eval(parse(text=paste0("hemo_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("neutro_", i), eval(parse(text=paste0("neutro_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+  }
+  rm(lab_neutro)
+  
+  #4, monocytes:
+  lab_mono <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[4, "npu"], "'"))
+  lab_mono <- lab_mono %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+  lab_mono <- left_join(lab_mono, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_mono <- lab_mono %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  lab_mono <- left_join(lab_mono, diag, by="lbnr")
+  lab_mono <- left_join(lab_mono, dar, by="lbnr") 
+  lab_mono <- left_join(lab_mono, cpr_reg, by="lbnr")
+  lab_mono <- lab_mono %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "UC")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  lab_mono <- lab_mono %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+
+  lab_mono$VALUE <- gsub(",", ".", lab_mono$VALUE)
+  sub <- lab_mono %>% filter(as.numeric(VALUE)<0.02)
+  m_CD <- median(as.numeric(sub$VALUE))
+  lab_mono$VALUE <- gsub("<0.02", m_CD, lab_mono$VALUE)
+  rm(sub)
+
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("mono_", i), lab_mono %>% filter(time_interval==i))
+    assign(paste0("common_", i), Reduce(intersect, list(eval(parse(text=paste0("common_", i))), eval(parse(text=paste0("mono_", i, "$lbnr"))))))
+    
+    assign(paste0("crp_", i), eval(parse(text=paste0("crp_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("hemo_", i), eval(parse(text=paste0("hemo_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("neutro_", i), eval(parse(text=paste0("neutro_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("mono_", i), eval(parse(text=paste0("mono_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+  }
+  rm(lab_mono)
+  
+  #5, platelets:
+  lab_throm <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[5, "npu"], "'"))
+  lab_throm <- lab_throm %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+  lab_throm <- left_join(lab_throm, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_throm <- lab_throm %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  lab_throm <- left_join(lab_throm, diag, by="lbnr")
+  lab_throm <- left_join(lab_throm, dar, by="lbnr") 
+  lab_throm <- left_join(lab_throm, cpr_reg, by="lbnr")
+  lab_throm <- lab_throm %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "UC")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  lab_throm <- lab_throm %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+
+  sub <- lab_throm %>% filter(as.numeric(VALUE)<5)
+  m_CD <- median(as.numeric(sub$VALUE))
+  lab_throm$VALUE <- gsub("<5", m_CD, lab_throm$VALUE)
+  rm(sub)
+
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("throm_", i), lab_throm %>% filter(time_interval==i))
+    assign(paste0("common_", i), Reduce(intersect, list(eval(parse(text=paste0("common_", i))), eval(parse(text=paste0("throm_", i, "$lbnr"))))))
+    
+    assign(paste0("crp_", i), eval(parse(text=paste0("crp_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("hemo_", i), eval(parse(text=paste0("hemo_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("neutro_", i), eval(parse(text=paste0("neutro_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("mono_", i), eval(parse(text=paste0("mono_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("throm_", i), eval(parse(text=paste0("throm_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+  }
+  rm(lab_throm)
+  
+  #6, eosinophils:
+  lab_eos <- dbGetQuery(con, paste0("SELECT * FROM FSEID00001565.LAB_LAB_DM_FORSKER WHERE ANALYSISCODE = '", npu_df[6, "npu"], "'"))
+  lab_eos <- lab_eos %>% filter(SAMPLINGDATE<=dates[period] & REKVIRENT_IDTYPE == "ydernummer")
+  lab_eos <- left_join(lab_eos, pseudo_cpr, by="PATIENT_CPR_ENCRYPTED")
+  lab_eos <- lab_eos %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE)
+  lab_eos <- left_join(lab_eos, diag, by="lbnr")
+  lab_eos <- left_join(lab_eos, dar, by="lbnr") 
+  lab_eos <- left_join(lab_eos, cpr_reg, by="lbnr")
+  lab_eos <- lab_eos %>% filter(In_DK %in% c(1, NA) & greenland != 1 & !(lbnr %in% diag_old$lbnr) & IBD %in% c(NA, "UC")) %>% filter(is.na(date_of_death)|date_of_death>dates[period]) %>% transform(SAMPLINGDATE = as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO), D_inddto = as.Date(D_inddto), date_of_death = as.Date(date_of_death)) %>% select(lbnr, LABORATORIUM_IDCODE, SAMPLINGDATE, UNIT, VALUE, D_inddto, IBD, D_FODDATO, C_KON)
+  lab_eos <- lab_eos %>% mutate(time_interval = as.numeric(ceiling((dates[period]-SAMPLINGDATE+1)/365.25)))
+  
+  lab_eos$VALUE <- gsub(",", ".", lab_eos$VALUE)
+  sub <- lab_eos %>% filter(as.numeric(VALUE)<0.02)
+  m_CD <- median(as.numeric(sub$VALUE))
+  lab_eos$VALUE <- gsub("<0.02", m_CD, lab_eos$VALUE)
+  rm(sub)
+
+  for (i in 1:max(lab_crp$time_interval)){
+    assign(paste0("eos_", i), lab_eos %>% filter(time_interval==i))
+    assign(paste0("common_", i), Reduce(intersect, list(eval(parse(text=paste0("common_", i))), eval(parse(text=paste0("eos_", i, "$lbnr"))))))
+    
+    assign(paste0("crp_", i), eval(parse(text=paste0("crp_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("hemo_", i), eval(parse(text=paste0("hemo_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("neutro_", i), eval(parse(text=paste0("neutro_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("mono_", i), eval(parse(text=paste0("mono_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("throm_", i), eval(parse(text=paste0("throm_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+    assign(paste0("eos_", i), eval(parse(text=paste0("eos_", i))) %>% filter(lbnr %in% eval(parse(text=paste0("common_", i)))))
+  }
+  rm(lab_eos, diag, diag_old)
+  
+  #Go through all time intervals and all cases
+  #Perform matching
+  
+  for (i in 1:max(lab_crp$time_interval)){
+    cases_crp <- eval(parse(text=paste0("crp_", i))) %>% filter(IBD == "UC")
+    controls_crp <- eval(parse(text=paste0("crp_", i))) %>% filter(is.na(IBD))
+    cases_hemo <- eval(parse(text=paste0("hemo_", i))) %>% filter(IBD == "UC")
+    controls_hemo <- eval(parse(text=paste0("hemo_", i))) %>% filter(is.na(IBD))
+    cases_neutro <- eval(parse(text=paste0("neutro_", i))) %>% filter(IBD == "UC")
+    controls_neutro <- eval(parse(text=paste0("neutro_", i))) %>% filter(is.na(IBD))
+    cases_mono <- eval(parse(text=paste0("mono_", i))) %>% filter(IBD == "UC")
+    controls_mono <- eval(parse(text=paste0("mono_", i))) %>% filter(is.na(IBD))
+    cases_throm <- eval(parse(text=paste0("throm_", i))) %>% filter(IBD == "UC")
+    controls_throm <- eval(parse(text=paste0("throm_", i))) %>% filter(is.na(IBD))
+    cases_eos <- eval(parse(text=paste0("eos_", i))) %>% filter(IBD == "UC")
+    controls_eos <- eval(parse(text=paste0("eos_", i))) %>% filter(is.na(IBD))
+    
+    #rm(eval(parse(text=paste0("crp_", i))), eval(parse(text=paste0("hemo_", i))), eval(parse(text=paste0("leuko_", i))), eval(parse(text=paste0("mono_", i))), eval(parse(text=paste0("throm_", i))))
+    
+    df_cases_controls <- data.frame()
+
+    for (j in unique(cases_crp$lbnr)){
+      ca_crp <- cases_crp %>% filter(lbnr == j)
+      ca_hemo <- cases_hemo %>% filter(lbnr == j)
+      ca_neutro <- cases_neutro %>% filter(lbnr == j)
+      ca_mono <- cases_mono %>% filter(lbnr == j)
+      ca_throm <- cases_throm %>% filter(lbnr == j)
+      ca_eos <- cases_eos %>% filter(lbnr == j)
+      
+      common_lab <- Reduce(intersect, list(ca_crp$LABORATORIUM_IDCODE, ca_hemo$LABORATORIUM_IDCODE, ca_neutro$LABORATORIUM_IDCODE, ca_mono$LABORATORIUM_IDCODE, ca_throm$LABORATORIUM_IDCODE, ca_eos$LABORATORIUM_IDCODE))
+      
+      if(length(common_lab)>0){
+        lab <- common_lab[1]
+      ca_crp <- ca_crp %>% filter(LABORATORIUM_IDCODE==lab)
+      co_crp <- controls_crp %>% filter(C_KON == ca_crp[1, "C_KON"] & D_FODDATO <= ca_crp[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_crp[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      ca_hemo <- ca_hemo %>% filter(LABORATORIUM_IDCODE==lab)
+      co_hemo <- controls_hemo %>% filter(C_KON == ca_hemo[1, "C_KON"] & D_FODDATO <= ca_hemo[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_hemo[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      ca_neutro <- ca_neutro %>% filter(LABORATORIUM_IDCODE==lab)
+      co_neutro <- controls_neutro %>% filter(C_KON == ca_neutro[1, "C_KON"] & D_FODDATO <= ca_neutro[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_neutro[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      ca_mono <- ca_mono %>% filter(LABORATORIUM_IDCODE==lab)
+      co_mono <- controls_mono %>% filter(C_KON == ca_mono[1, "C_KON"] & D_FODDATO <= ca_mono[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_mono[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      ca_throm <- ca_throm %>% filter(LABORATORIUM_IDCODE==lab)
+      co_throm <- controls_throm %>% filter(C_KON == ca_throm[1, "C_KON"] & D_FODDATO <= ca_throm[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_throm[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      ca_eos <- ca_eos %>% filter(LABORATORIUM_IDCODE==lab)
+      co_eos <- controls_eos %>% filter(C_KON == ca_eos[1, "C_KON"] & D_FODDATO <= ca_eos[1, "D_FODDATO"]+5*365.25 & D_FODDATO >= ca_eos[1, "D_FODDATO"]-5*365.25 & LABORATORIUM_IDCODE == lab)
+      
+      common <- Reduce(intersect, list(co_crp$lbnr, co_hemo$lbnr, co_neutro$lbnr, co_mono$lbnr, co_throm$lbnr, co_eos$lbnr))
+      
+      if(length(common)>0){
+        
+        #Save case and control
+        df_cases_controls <- rbind(df_cases_controls, data.frame(lbnr = j, LABORATORIUM_IDCODE = lab, SAMPLINGDATE= median(ca_crp$SAMPLINGDATE), D_FODDATO = ca_crp[1, "D_FODDATO"], C_KON = ca_crp[1, "C_KON"], IBD = "UC", crp = median(as.numeric(ca_crp$VALUE)), hemo = median(as.numeric(ca_hemo$VALUE)), neutro = median(as.numeric(ca_neutro$VALUE)), mono = median(as.numeric(ca_mono$VALUE)), throm = median(as.numeric(ca_throm$VALUE)), eos = median(as.numeric(ca_eos$VALUE))))
+
+        common <- sample(common, 1)
+        co_crp <- co_crp %>% filter(lbnr==common)
+        co_hemo <- co_hemo %>% filter(lbnr==common)
+        co_neutro <- co_neutro %>% filter(lbnr==common)
+        co_mono <- co_mono %>% filter(lbnr==common)
+        co_throm <- co_throm %>% filter(lbnr==common)
+        co_eos <- co_eos %>% filter(lbnr==common)
+        
+        df_cases_controls <- rbind(df_cases_controls, data.frame(lbnr = common, LABORATORIUM_IDCODE = lab, SAMPLINGDATE= median(co_crp$SAMPLINGDATE), D_FODDATO = co_crp[1, "D_FODDATO"], C_KON = co_crp[1, "C_KON"], IBD = "Control", crp = median(as.numeric(co_crp$VALUE)), hemo = median(as.numeric(co_hemo$VALUE)), neutro = median(as.numeric(co_neutro$VALUE)), mono = median(as.numeric(co_mono$VALUE)), throm = median(as.numeric(co_throm$VALUE)), eos = median(as.numeric(co_eos$VALUE))))
+        
+      }
+      
+      rm(common, co_crp, co_hemo, co_neutro, co_mono, co_throm, co_eos)
+      }
+      rm(common_lab, ca_crp, ca_hemo, ca_neutro, ca_mono, ca_throm, ca_eos)
+    }
+    #Open data frame so far and add:
+      so_far <- read.csv(paste0("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_", i, "_UC.txt"))
+      so_far <- so_far %>% transform(SAMPLINGDATE =as.Date(SAMPLINGDATE), D_FODDATO = as.Date(D_FODDATO))
+    so_far <- rbind(so_far, df_cases_controls)
+    
+    write.csv(so_far, paste0("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_", i, "_UC.txt"), row.names = F)
+    rm(so_far, df_cases_controls, lab_crp)
+  }
+}
+
+```
+
+
+# Read in dataframes
+Read in dataframes for each time interval and transform values based on the transformation chosen in the statistical models:
+
+CD:
+```{r}
+#1
+df1_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_1_CD.txt")
+table(df1_CD$IBD) #1186 of each
+
+df1_CD$crp_trans <- log(as.numeric(df1_CD$crp)+1)
+df1_CD$neutro_trans <- log(as.numeric(df1_CD$neutro)+1)
+df1_CD$mono_trans <- log(as.numeric(df1_CD$mono)+1)
+df1_CD$throm_trans <- sqrt(as.numeric(df1_CD$throm))
+df1_CD$hemo_trans <- as.numeric(df1_CD$hemo)
+df1_CD$eos_trans <- sqrt(as.numeric(df1_CD$eos))
+df1_CD <- df1_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#2
+df2_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_2_CD.txt")
+table(df2_CD$IBD) #470 of each
+
+df2_CD$crp_trans <- log(as.numeric(df2_CD$crp)+1)
+df2_CD$neutro_trans <- log(as.numeric(df2_CD$neutro)+1)
+df2_CD$mono_trans <- log(as.numeric(df2_CD$mono)+1)
+df2_CD$throm_trans <- sqrt(as.numeric(df2_CD$throm))
+df2_CD$hemo_trans <- as.numeric(df2_CD$hemo)
+df2_CD$eos_trans <- sqrt(as.numeric(df2_CD$eos))
+df2_CD <- df2_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#3
+df3_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_3_CD.txt")
+table(df3_CD$IBD) #352 of each
+
+df3_CD$crp_trans <- log(as.numeric(df3_CD$crp)+1)
+df3_CD$neutro_trans <- log(as.numeric(df3_CD$neutro)+1)
+df3_CD$mono_trans <- log(as.numeric(df3_CD$mono)+1)
+df3_CD$throm_trans <- sqrt(as.numeric(df3_CD$throm))
+df3_CD$hemo_trans <- as.numeric(df3_CD$hemo)
+df3_CD$eos_trans <- sqrt(as.numeric(df3_CD$eos))
+df3_CD <- df3_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#4
+df4_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_4_CD.txt")
+table(df4_CD$IBD) #251 of each
+
+df4_CD$crp_trans <- log(as.numeric(df4_CD$crp)+1)
+df4_CD$neutro_trans <- log(as.numeric(df4_CD$neutro)+1)
+df4_CD$mono_trans <- log(as.numeric(df4_CD$mono)+1)
+df4_CD$throm_trans <- sqrt(as.numeric(df4_CD$throm))
+df4_CD$hemo_trans <- as.numeric(df4_CD$hemo)
+df4_CD$eos_trans <- sqrt(as.numeric(df4_CD$eos))
+df4_CD <- df4_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#5
+df5_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_5_CD.txt")
+table(df5_CD$IBD) #186 of each
+
+df5_CD$crp_trans <- log(as.numeric(df5_CD$crp)+1)
+df5_CD$neutro_trans <- log(as.numeric(df5_CD$neutro)+1)
+df5_CD$mono_trans <- log(as.numeric(df5_CD$mono)+1)
+df5_CD$throm_trans <- sqrt(as.numeric(df5_CD$throm))
+df5_CD$hemo_trans <- as.numeric(df5_CD$hemo)
+df5_CD$eos_trans <- sqrt(as.numeric(df5_CD$eos))
+df5_CD <- df5_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#6
+df6_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_6_CD.txt")
+table(df6_CD$IBD) #126 of each
+
+df6_CD$crp_trans <- log(as.numeric(df6_CD$crp)+1)
+df6_CD$neutro_trans <- log(as.numeric(df6_CD$neutro)+1)
+df6_CD$mono_trans <- log(as.numeric(df6_CD$mono)+1)
+df6_CD$throm_trans <- sqrt(as.numeric(df6_CD$throm))
+df6_CD$hemo_trans <- as.numeric(df6_CD$hemo)
+df6_CD$eos_trans <- sqrt(as.numeric(df6_CD$eos))
+df6_CD <- df6_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#7
+df7_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_7_CD.txt")
+table(df7_CD$IBD) #92 of each
+
+df7_CD$crp_trans <- log(as.numeric(df7_CD$crp)+1)
+df7_CD$neutro_trans <- log(as.numeric(df7_CD$neutro)+1)
+df7_CD$mono_trans <- log(as.numeric(df7_CD$mono)+1)
+df7_CD$throm_trans <- sqrt(as.numeric(df7_CD$throm))
+df7_CD$hemo_trans <- as.numeric(df7_CD$hemo)
+df7_CD$eos_trans <- sqrt(as.numeric(df7_CD$eos))
+df7_CD <- df7_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#8
+df8_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_8_CD.txt")
+table(df8_CD$IBD) #35 of each
+
+df8_CD$crp_trans <- log(as.numeric(df8_CD$crp)+1)
+df8_CD$neutro_trans <- log(as.numeric(df8_CD$neutro)+1)
+df8_CD$mono_trans <- log(as.numeric(df8_CD$mono)+1)
+df8_CD$throm_trans <- sqrt(as.numeric(df8_CD$throm))
+df8_CD$hemo_trans <- as.numeric(df8_CD$hemo)
+df8_CD$eos_trans <- sqrt(as.numeric(df8_CD$eos))
+df8_CD <- df8_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#9
+df9_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_9_CD.txt")
+table(df9_CD$IBD) #18 of each
+
+df9_CD$crp_trans <- log(as.numeric(df9_CD$crp)+1)
+df9_CD$neutro_trans <- log(as.numeric(df9_CD$neutro)+1)
+df9_CD$mono_trans <- log(as.numeric(df9_CD$mono)+1)
+df9_CD$throm_trans <- sqrt(as.numeric(df9_CD$throm))
+df9_CD$hemo_trans <- as.numeric(df9_CD$hemo)
+df9_CD$eos_trans <- sqrt(as.numeric(df9_CD$eos))
+df9_CD <- df9_CD %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+```
+
+UC:
+```{r}
+#1
+df1_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_1_UC.txt")
+table(df1_UC$IBD) #1818 of each
+
+df1_UC$crp_trans <- log(as.numeric(df1_UC$crp)+1)
+df1_UC$neutro_trans <- log(as.numeric(df1_UC$neutro)+1)
+df1_UC$mono_trans <- log(as.numeric(df1_UC$mono)+1)
+df1_UC$throm_trans <- sqrt(as.numeric(df1_UC$throm))
+df1_UC$hemo_trans <- as.numeric(df1_UC$hemo)
+df1_UC$eos_trans <- sqrt(as.numeric(df1_UC$eos))
+df1_UC <- df1_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#2
+df2_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_2_UC.txt")
+table(df2_UC$IBD) #703 of each
+
+df2_UC$crp_trans <- log(as.numeric(df2_UC$crp)+1)
+df2_UC$neutro_trans <- log(as.numeric(df2_UC$neutro)+1)
+df2_UC$mono_trans <- log(as.numeric(df2_UC$mono)+1)
+df2_UC$throm_trans <- sqrt(as.numeric(df2_UC$throm))
+df2_UC$hemo_trans <- as.numeric(df2_UC$hemo)
+df2_UC$eos_trans <- sqrt(as.numeric(df2_UC$eos))
+df2_UC <- df2_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#3
+df3_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_3_UC.txt")
+table(df3_UC$IBD) #541 of each
+
+df3_UC$crp_trans <- log(as.numeric(df3_UC$crp)+1)
+df3_UC$neutro_trans <- log(as.numeric(df3_UC$neutro)+1)
+df3_UC$mono_trans <- log(as.numeric(df3_UC$mono)+1)
+df3_UC$throm_trans <- sqrt(as.numeric(df3_UC$throm))
+df3_UC$hemo_trans <- as.numeric(df3_UC$hemo)
+df3_UC$eos_trans <- sqrt(as.numeric(df3_UC$eos))
+df3_UC <- df3_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#4
+df4_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_4_UC.txt")
+table(df4_UC$IBD) #373 of each
+
+df4_UC$crp_trans <- log(as.numeric(df4_UC$crp)+1)
+df4_UC$neutro_trans <- log(as.numeric(df4_UC$neutro)+1)
+df4_UC$mono_trans <- log(as.numeric(df4_UC$mono)+1)
+df4_UC$throm_trans <- sqrt(as.numeric(df4_UC$throm))
+df4_UC$hemo_trans <- as.numeric(df4_UC$hemo)
+df4_UC$eos_trans <- sqrt(as.numeric(df4_UC$eos))
+df4_UC <- df4_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#5
+df5_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_5_UC.txt")
+table(df5_UC$IBD) #274 of each
+
+df5_UC$crp_trans <- log(as.numeric(df5_UC$crp)+1)
+df5_UC$neutro_trans <- log(as.numeric(df5_UC$neutro)+1)
+df5_UC$mono_trans <- log(as.numeric(df5_UC$mono)+1)
+df5_UC$throm_trans <- sqrt(as.numeric(df5_UC$throm))
+df5_UC$hemo_trans <- as.numeric(df5_UC$hemo)
+df5_UC$eos_trans <- sqrt(as.numeric(df5_UC$eos))
+df5_UC <- df5_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#6
+df6_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_6_UC.txt")
+table(df6_UC$IBD) #196 of each
+
+df6_UC$crp_trans <- log(as.numeric(df6_UC$crp)+1)
+df6_UC$neutro_trans <- log(as.numeric(df6_UC$neutro)+1)
+df6_UC$mono_trans <- log(as.numeric(df6_UC$mono)+1)
+df6_UC$throm_trans <- sqrt(as.numeric(df6_UC$throm))
+df6_UC$hemo_trans <- as.numeric(df6_UC$hemo)
+df6_UC$eos_trans <- sqrt(as.numeric(df6_UC$eos))
+df6_UC <- df6_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#7
+df7_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_7_UC.txt")
+table(df7_UC$IBD) #128 of each
+
+df7_UC$crp_trans <- log(as.numeric(df7_UC$crp)+1)
+df7_UC$neutro_trans <- log(as.numeric(df7_UC$neutro)+1)
+df7_UC$mono_trans <- log(as.numeric(df7_UC$mono)+1)
+df7_UC$throm_trans <- sqrt(as.numeric(df7_UC$throm))
+df7_UC$hemo_trans <- as.numeric(df7_UC$hemo)
+df7_UC$eos_trans <- sqrt(as.numeric(df7_UC$eos))
+df7_UC <- df7_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#8
+df8_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_8_UC.txt")
+table(df8_UC$IBD) #82 of each
+
+df8_UC$crp_trans <- log(as.numeric(df8_UC$crp)+1)
+df8_UC$neutro_trans <- log(as.numeric(df8_UC$neutro)+1)
+df8_UC$mono_trans <- log(as.numeric(df8_UC$mono)+1)
+df8_UC$throm_trans <- sqrt(as.numeric(df8_UC$throm))
+df8_UC$hemo_trans <- as.numeric(df8_UC$hemo)
+df8_UC$eos_trans <- sqrt(as.numeric(df8_UC$eos))
+df8_UC <- df8_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+
+#9
+df9_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Combined_matched_9_UC.txt")
+table(df9_UC$IBD) #33 of each
+
+df9_UC$crp_trans <- log(as.numeric(df9_UC$crp)+1)
+df9_UC$neutro_trans <- log(as.numeric(df9_UC$neutro)+1)
+df9_UC$mono_trans <- log(as.numeric(df9_UC$mono)+1)
+df9_UC$throm_trans <- sqrt(as.numeric(df9_UC$throm))
+df9_UC$hemo_trans <- as.numeric(df9_UC$hemo)
+df9_UC$eos_trans <- sqrt(as.numeric(df9_UC$eos))
+df9_UC <- df9_UC %>% mutate(age =  as.numeric(as.Date(SAMPLINGDATE) - as.Date(D_FODDATO))/365.25)
+```
+
+# Logistic regression (and figure 2A+B)
+Fit model using time interval 1 - validate on validation data from time interval 1 and all data from other time intervals:
+CD:
+```{r}
+df1_CD$IBD_bin <- ifelse(df1_CD$IBD == "CD", 1, 0)
+
+#Split time itnerval 1 in training and validation data:
+set.seed(0)
+ind <- sample(2, nrow(df1_CD), replace=T, prob=c(0.8, 0.2))
+train_df <- df1_CD[ind==1,]
+test_df_CD <- df1_CD[ind==2,]
+
+model1 <- glm(IBD_bin~C_KON+age+crp_trans+neutro_trans+mono_trans+throm_trans+hemo_trans+eos_trans+LABORATORIUM_IDCODE, family=binomial, data=train_df)
+summary(model1)
+
+model2 <- glm(IBD_bin~(C_KON+age)*(crp_trans+neutro_trans+mono_trans+throm_trans+hemo_trans+eos_trans)+LABORATORIUM_IDCODE, family=binomial, data=train_df)
+summary(model2)
+
+test_df_CD$statistic <- predict(model1, newdata=test_df_CD)
+test_df_CD$statistic2 <- predict(model2, newdata=test_df_CD)
+
+test_df_CD$t1 <- ifelse(test_df_CD$statistic>0, "CD", "Control")
+sum(test_df_CD$t1 == test_df_CD$IBD) / 477 #0.6730
+test_df_CD$t2 <- ifelse(test_df_CD$statistic2>0, "CD", "Control")
+sum(test_df_CD$t2 ==test_df_CD$IBD) / 477 #0.6667
+
+pred_1 <- predict(model1, test_df_CD, type="response")
+auc(test_df_CD$IBD_bin, pred_1) #0.7266
+pred_2 <- predict(model2, test_df_CD, type="response")
+auc(test_df_CD$IBD_bin, pred_2) #0.7157
+
+#Go with model 1. -> highest accuracy and AUC
+
+#Some labs are not in df1. Remove from other df's before fitting the model to the data:
+
+df2_CD_sub <- df2_CD %>% filter(LABORATORIUM_IDCODE !="RN")
+pred_2 <- predict(model1, df2_CD_sub, type="response")
+df2_CD_sub$statistic <- predict(model1, newdata=df2_CD_sub)
+df3_CD$statistic <- predict(model1, newdata=df3_CD)
+df4_CD$statistic <- predict(model1, newdata=df4_CD)
+df5_CD$statistic <- predict(model1, newdata=df5_CD)
+df6_CD$statistic <- predict(model1, newdata=df6_CD)
+df7_CD_sub <- df7_CD %>% filter(LABORATORIUM_IDCODE !="RN")
+df7_CD_sub$statistic <- predict(model1, newdata=df7_CD_sub)
+df8_CD_sub <- df8_CD %>% filter(LABORATORIUM_IDCODE !="RN")
+df8_CD_sub$statistic <- predict(model1, newdata=df8_CD_sub)
+df9_CD$statistic <- predict(model1, newdata=df9_CD)
+
+
+#Plot Statistic:
+p1 <- ggplot(test_df_CD)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 1")
+p2 <- ggplot(df2_CD_sub)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 2")
+p3 <- ggplot(df3_CD)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 3")
+p4 <- ggplot(df4_CD)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 4")
+p5 <- ggplot(df5_CD)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 5")
+p6 <- ggplot(df6_CD)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 6")
+p7 <- ggplot(df7_CD_sub)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 7")
+p8 <- ggplot(df8_CD_sub)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 8")
+p9 <- ggplot(df9_CD)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 9")
+leg <- get_legend(p1)
+ggarrange(p1+theme(legend.position = "none"), p2+theme(legend.position = "none"), 
+          p3+theme(legend.position = "none"), p4+theme(legend.position = "none"), 
+          p5+theme(legend.position = "none"), p6+theme(legend.position = "none"), 
+          p7+theme(legend.position = "none"), p8+theme(legend.position = "none"), 
+          p9+theme(legend.position = "none"), leg, ncol= 2, nrow=5)
+
+
+# Look at development of statistic over time in one plot:
+test_df_CD$time <- -1
+test_df_CD <- test_df_CD %>% select(-IBD_bin, -t1, -t2, -statistic2)
+df2_CD_sub$time <- -2
+df3_CD$time <- -3
+df4_CD$time <- -4
+df5_CD$time <- -5
+df6_CD$time <- -6
+df7_CD_sub$time <- -7
+df8_CD_sub$time <- -8
+df9_CD$time <- -9
+
+df_CD <- rbind(test_df_CD, df2_CD_sub, df3_CD, df4_CD, df5_CD, df6_CD, df7_CD_sub, df8_CD_sub, df9_CD)
+
+#Lines of mean +- SE:
+df_plot_CD <- df_CD %>% group_by(time, IBD) %>% summarise(M = mean(statistic), SD = sd(statistic), SE = sd(statistic)/sqrt(n()), N = n())
+df_plot_CD$IBD <- factor(df_plot_CD$IBD, levels = c("Control", "CD"))
+
+```
+
+UC:
+```{r}
+df1_UC$IBD_bin <- ifelse(df1_UC$IBD == "UC", 1, 0)
+
+#Split time itnerval 1 in training and validation data:
+set.seed(0)
+ind <- sample(2, nrow(df1_UC), replace=T, prob=c(0.8, 0.2))
+train_df <- df1_UC[ind==1,]
+test_df_UC <- df1_UC[ind==2,]
+
+model1 <- glm(IBD_bin~C_KON+age+crp_trans+neutro_trans+mono_trans+throm_trans+hemo_trans+eos_trans+LABORATORIUM_IDCODE, family=binomial, data=train_df)
+summary(model1)
+
+test_df_UC$statistic <- predict(model1, newdata=test_df_UC)
+
+test_df_UC$t1 <- ifelse(test_df_UC$statistic>0, "UC", "Control")
+sum(test_df_UC$t1 == test_df_UC$IBD) / 742 #0.6092
+
+pred_1 <- predict(model1, test_df_UC, type="response")
+auc(test_df_UC$IBD_bin, pred_1) #0.6456
+
+df2_UC$statistic <- predict(model1, newdata=df2_UC)
+df3_UC$statistic <- predict(model1, newdata=df3_UC)
+df4_UC$statistic <- predict(model1, newdata=df4_UC)
+df5_UC$statistic <- predict(model1, newdata=df5_UC)
+df6_UC$statistic <- predict(model1, newdata=df6_UC)
+df7_UC$statistic <- predict(model1, newdata=df7_UC)
+df8_UC$statistic <- predict(model1, newdata=df8_UC)
+df9_UC$statistic <- predict(model1, newdata=df9_UC)
+
+#Plot Statistic:
+p1 <- ggplot(test_df_UC)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 1")
+p2 <- ggplot(df2_UC)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 2")
+p3 <- ggplot(df3_UC)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 3")
+p4 <- ggplot(df4_UC)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 4")
+p5 <- ggplot(df5_UC)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 5")
+p6 <- ggplot(df6_UC)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 6")
+p7 <- ggplot(df7_UC)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 7")
+p8 <- ggplot(df8_UC)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 8")
+p9 <- ggplot(df9_UC)+
+  geom_density(aes(x=statistic, color=IBD))+theme_classic()+ylab("Density")+xlab("Statistic")+geom_vline(aes(xintercept=0), linetype="dashed")+ggtitle("Time interval 9")
+leg <- get_legend(p1)
+ggarrange(p1+theme(legend.position = "none"), p2+theme(legend.position = "none"), 
+          p3+theme(legend.position = "none"), p4+theme(legend.position = "none"), 
+          p5+theme(legend.position = "none"), p6+theme(legend.position = "none"), 
+          p7+theme(legend.position = "none"), p8+theme(legend.position = "none"), 
+          p9+theme(legend.position = "none"), leg, ncol= 2, nrow=5)
+
+
+# Look at development of statistic over time in one plot:
+test_df_UC$time <- -1
+test_df_UC <- test_df_UC %>% select(-IBD_bin, -t1)
+df2_UC$time <- -2
+df3_UC$time <- -3
+df4_UC$time <- -4
+df5_UC$time <- -5
+df6_UC$time <- -6
+df7_UC$time <- -7
+df8_UC$time <- -8
+df9_UC$time <- -9
+
+df_UC <- rbind(test_df_UC, df2_UC, df3_UC, df4_UC, df5_UC, df6_UC, df7_UC, df8_UC, df9_UC)
+
+#Lines of mean +- SE:
+df_plot_UC <- df_UC %>% group_by(time, IBD) %>% summarise(M = mean(statistic), SD = sd(statistic), SE = sd(statistic)/sqrt(n()), N = n())
+
+df_plot_CD$IBD <- ifelse(df_plot_CD$IBD == "CD", "Cases", "Controls")
+df_plot_UC$IBD <- ifelse(df_plot_UC$IBD == "UC", "Cases", "Controls")
+
+df_plot_CD$Disease <- "CD"
+df_plot_UC$Disease <- "UC"
+
+df_plot <- rbind(df_plot_CD, df_plot_UC)
+
+df_plot$ribbon <- paste0(df_plot$Disease, "_", df_plot$IBD)
+
+ggplot(df_plot)+
+  geom_line(aes(x =time, y=M, color=Disease, linetype=IBD))+
+  geom_ribbon(aes(x=time, ymin=M-SE, ymax=M+SE, group=ribbon), alpha=0.1)+
+  xlab("Time interval")+ylab("Log odds")+theme_classic()+scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  labs(color = "Cohort", linetype = "Sample type")+
+  theme(text = element_text(family="sans", size=8))
+
+
+#plot with probability in stead of log odds for figure 2A:
+
+logit2prob <- function(logit){
+  odds <- exp(logit)
+  prob <- odds/(1+odds)
+  return(prob)
+}
+
+fig_2A <- ggplot(df_plot)+
+  geom_line(aes(x =time, y=logit2prob(M), color=Disease, linetype=IBD))+
+  geom_ribbon(aes(x=time, ymin=logit2prob(M-SE), ymax=logit2prob(M+SE), group=ribbon), alpha=0.1)+
+  xlab("Time interval")+ylab("Probability of IBD")+
+  theme_classic()+scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  labs(color = "Cohort", linetype = "Sample type")+
+  theme(text = element_text(family="sans", size=8))
+
+```
+
+
+# Random Forest model
+
+Split in training and validation dataset for time interval 1. Fit model on training data. validate model on validation data from time interval 1 and all data from other time intervals.  
+
+For CD:
+```{r}
+#Randomly split df1 into training (80%) and validation (20%):
+df1_CD <- df1_CD %>% select(IBD,C_KON,age,crp_trans, neutro_trans, mono_trans, throm_trans,hemo_trans,eos_trans, LABORATORIUM_IDCODE)
+df1_CD$IBD <- as.factor(df1_CD$IBD)
+
+set.seed(0)
+ind <- sample(2, nrow(df1_CD), replace=T, prob=c(0.8, 0.2))
+train_df <- df1_CD[ind==1,]
+test_df_CD <- df1_CD[ind==2,]
+
+#Grid search:
+control <- trainControl(method = "repeatedcv", number=10, repeats=3)
+metric = "Accuracy"
+customRF <- list(type = "Classification", library = "randomForest", loop=NULL)
+customRF$parameters <- data.frame(parameter=c("mtry", "ntree"), class = rep("numeric", 2), label = c("mtry", "ntree"))
+customRF$grid <- function(x,y,len=NULL, search="grid"){}
+customRF$fit <- function(x,y,wts,param,lev,last,weights,classProbs, ...){
+  randomForest(x,y,mtry=param$mtry, ntree=param$ntree, ...)
+}
+customRF$predict <- function(modelFit, newdata, preProc=NULL, submodels=NULL)
+  predict(modelFit, newdata)
+customRF$prob <- function(modelFit, newdata, preProc=NULL, submodels=NULL)
+  predict(modelFit, newdata, type="prob")
+customRF$sort <- function(x) x[order(x[,1]),]
+customRF$levels <- function(x) x$classes
+
+#Grid search
+tunegrid <- expand.grid(.mtry=c(2, 4, 6, 8), .ntree=c(500, 1000, 1500, 2000, 2500))
+set.seed(0)
+custom <- train(IBD~., data=train_df, method=customRF, metric=metric, tuneGrid=tunegrid, trControl=control, na.action = na.omit)
+plot(custom)
+custom$results$Accuracy
+custom$finalModel
+
+#Finer grid search
+tunegrid <- expand.grid(.mtry=c(3, 4, 5), .ntree=c(1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400))
+set.seed(0)
+custom2 <- train(IBD~., data=train_df, method=customRF, metric=metric, tuneGrid=tunegrid, trControl=control, na.action = na.omit)
+plot(custom2)
+max(custom2$results$Accuracy)
+custom2$finalModel
+best_mtry <- 3
+best_ntree <- 1500
+
+#Save model:
+saveRDS(custom2, file= "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/RF_trained_model_CD.rds")
+
+custom2 <- readRDS(file= "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/RF_trained_model_CD.rds")
+
+#Predictions for all time intervals
+pred_1_CD <- as.data.frame(predict(custom2, test_df_CD, type="prob"))
+obs_1_CD <- ifelse(test_df_CD$IBD == "Control", 0, 1)
+perf_1_CD <- performance(prediction(pred_1_CD$CD, obs_1_CD), "tpr", "fpr")
+roc_1_CD <- data.frame(FPR = perf_1_CD@x.values, TPR = perf_1_CD@y.values)
+colnames(roc_1_CD) <- c("FPR", "TPR")
+auc_1_CD <- performance(prediction(pred_1_CD$CD, obs_1_CD), "auc")
+auc_1_CD <- auc_1_CD@y.values[[1]]
+auc_1_CD
+#We can test if AUC is significantly different from 0.5 using the Mann-Whitney  test:
+labels <- as.logical(obs_1_CD)
+pos <- pred_1_CD$CD[labels]
+neg <- pred_1_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 41889, p-value < 2.2e-16
+roc_1_CD$time <- "-1, AUC = 0.736, p-val < 2.2e-16"
+
+pred_2_CD <- as.data.frame(predict(custom2, df2_CD_sub, type="prob"))
+obs_2_CD <- ifelse(df2_CD_sub$IBD == "Control", 0, 1)
+perf_2_CD <- performance(prediction(pred_2_CD$CD, obs_2_CD), "tpr", "fpr")
+roc_2_CD <- data.frame(FPR = perf_2_CD@x.values, TPR = perf_2_CD@y.values)
+colnames(roc_2_CD) <- c("FPR", "TPR")
+auc_2_CD <- performance(prediction(pred_2_CD$CD, obs_2_CD), "auc")
+auc_2_CD <- auc_2_CD@y.values[[1]]
+auc_2_CD
+labels <- as.logical(obs_2_CD)
+pos <- pred_2_CD$CD[labels]
+neg <- pred_2_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 142246, p-value = 7.428e-15
+roc_2_CD$time <- "-2, AUC = 0.647, p-val = 7.4e-15"
+
+
+pred_3_CD <- as.data.frame(predict(custom2, df3_CD, type="prob"))
+obs_3_CD <- ifelse(df3_CD$IBD == "Control", 0, 1)
+perf_3_CD <- performance(prediction(pred_3_CD$CD, obs_3_CD), "tpr", "fpr")
+roc_3_CD <- data.frame(FPR = perf_3_CD@x.values, TPR = perf_3_CD@y.values)
+colnames(roc_3_CD) <- c("FPR", "TPR")
+auc_3_CD <- performance(prediction(pred_3_CD$CD, obs_3_CD), "auc")
+auc_3_CD <- auc_3_CD@y.values[[1]]
+auc_3_CD
+labels <- as.logical(obs_3_CD)
+pos <- pred_3_CD$CD[labels]
+neg <- pred_3_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 76670, p-value = 4.9e-08
+roc_3_CD$time <- "-3, AUC = 0.619, p-val = 4.9e-08"
+
+pred_4_CD <- as.data.frame(predict(custom2, df4_CD, type="prob"))
+obs_4_CD <- ifelse(df4_CD$IBD == "Control", 0, 1)
+perf_4_CD <- performance(prediction(pred_4_CD$CD, obs_4_CD), "tpr", "fpr")
+roc_4_CD <- data.frame(FPR = perf_4_CD@x.values, TPR = perf_4_CD@y.values)
+colnames(roc_4_CD) <- c("FPR", "TPR")
+auc_4_CD <- performance(prediction(pred_4_CD$CD, obs_4_CD), "auc")
+auc_4_CD <- auc_4_CD@y.values[[1]]
+auc_4_CD
+labels <- as.logical(obs_4_CD)
+pos <- pred_4_CD$CD[labels]
+neg <- pred_4_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 40689, p-value = 1.568e-08
+roc_4_CD$time <- "-4, AUC = 0.646, p-val = 1.6e-08"
+
+pred_5_CD <- as.data.frame(predict(custom2, df5_CD, type="prob"))
+obs_5_CD <- ifelse(df5_CD$IBD == "Control", 0, 1)
+perf_5_CD <- performance(prediction(pred_5_CD$CD, obs_5_CD), "tpr", "fpr")
+roc_5_CD <- data.frame(FPR = perf_5_CD@x.values, TPR = perf_5_CD@y.values)
+colnames(roc_5_CD) <- c("FPR", "TPR")
+auc_5_CD <- performance(prediction(pred_5_CD$CD, obs_5_CD), "auc")
+auc_5_CD <- auc_5_CD@y.values[[1]]
+auc_5_CD
+labels <- as.logical(obs_5_CD)
+pos <- pred_5_CD$CD[labels]
+neg <- pred_5_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 21264, p-value = 0.0001315
+roc_5_CD$time <- "-5, AUC = 0.615, p-val = 1.3e-04"
+
+pred_6_CD <- as.data.frame(predict(custom2, df6_CD, type="prob"))
+obs_6_CD <- ifelse(df6_CD$IBD == "Control", 0, 1)
+perf_6_CD <- performance(prediction(pred_6_CD$CD, obs_6_CD), "tpr", "fpr")
+roc_6_CD <- data.frame(FPR = perf_6_CD@x.values, TPR = perf_6_CD@y.values)
+colnames(roc_6_CD) <- c("FPR", "TPR")
+auc_6_CD <- performance(prediction(pred_6_CD$CD, obs_6_CD), "auc")
+auc_6_CD <- auc_6_CD@y.values[[1]]
+auc_6_CD
+labels <- as.logical(obs_6_CD)
+pos <- pred_6_CD$CD[labels]
+neg <- pred_6_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 10572, p-value = 5.337e-06
+roc_6_CD$time <- "-6, AUC = 0.666, p-val = 5.3e-06"
+
+pred_7_CD <- as.data.frame(predict(custom2, df7_CD_sub, type="prob"))
+obs_7_CD <- ifelse(df7_CD_sub$IBD == "Control", 0, 1)
+perf_7_CD <- performance(prediction(pred_7_CD$CD, obs_7_CD), "tpr", "fpr")
+roc_7_CD <- data.frame(FPR = perf_7_CD@x.values, TPR = perf_7_CD@y.values)
+colnames(roc_7_CD) <- c("FPR", "TPR")
+auc_7_CD <- performance(prediction(pred_7_CD$CD, obs_7_CD), "auc")
+auc_7_CD <- auc_7_CD@y.values[[1]]
+auc_7_CD
+labels <- as.logical(obs_7_CD)
+pos <- pred_7_CD$CD[labels]
+neg <- pred_7_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 4176.5, p-value = 0.9204
+roc_7_CD$time <- "-7, AUC = 0.504, p-val = 0.92"
+
+pred_8_CD <- as.data.frame(predict(custom2, df8_CD_sub, type="prob"))
+obs_8_CD <- ifelse(df8_CD_sub$IBD == "Control", 0, 1)
+perf_8_CD <- performance(prediction(pred_8_CD$CD, obs_8_CD), "tpr", "fpr")
+roc_8_CD <- data.frame(FPR = perf_8_CD@x.values, TPR = perf_8_CD@y.values)
+colnames(roc_8_CD) <- c("FPR", "TPR")
+auc_8_CD <- performance(prediction(pred_8_CD$CD, obs_8_CD), "auc")
+auc_8_CD <- auc_8_CD@y.values[[1]]
+auc_8_CD
+labels <- as.logical(obs_8_CD)
+pos <- pred_8_CD$CD[labels]
+neg <- pred_8_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 713, p-value = 0.09921
+roc_8_CD$time <- "-8, AUC = 0.617, p-val = 0.10"
+
+pred_9_CD <- as.data.frame(predict(custom2, df9_CD, type="prob"))
+obs_9_CD <- ifelse(df9_CD$IBD == "Control", 0, 1)
+perf_9_CD <- performance(prediction(pred_9_CD$CD, obs_9_CD), "tpr", "fpr")
+roc_9_CD <- data.frame(FPR = perf_9_CD@x.values, TPR = perf_9_CD@y.values)
+colnames(roc_9_CD) <- c("FPR", "TPR")
+auc_9_CD <- performance(prediction(pred_9_CD$CD, obs_9_CD), "auc")
+auc_9_CD <- auc_9_CD@y.values[[1]]
+auc_9_CD
+labels <- as.logical(obs_9_CD)
+pos <- pred_9_CD$CD[labels]
+neg <- pred_9_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 163, p-value = 0.9875
+roc_9_CD$time <- "-9, AUC = 0.503, p-val = 0.99"
+
+roc_df_CD <- rbind(roc_1_CD, roc_2_CD, roc_3_CD, roc_4_CD, roc_5_CD, roc_6_CD, roc_7_CD, roc_8_CD, roc_9_CD)
+
+fig_2C <- ggplot(roc_df_CD)+
+  geom_line(aes(x=FPR, y=TPR, color=as.factor(time)))+
+  geom_abline(intercept=0, slope=1, color="grey50", linetype="dashed")+
+  theme_classic()+labs(color="Time interval")+
+  theme(text = element_text(family="sans", size=8))
+
+
+df_sum_CD <- data.frame(Time_interval = -1:-9, AUC = c(auc_1_CD,auc_2_CD, auc_3_CD, auc_4_CD, auc_5_CD, auc_6_CD, auc_7_CD, auc_8_CD, auc_9_CD), N = c(477, 938,704,502,372,252,182,68,36))
+
+#Alternative to figure 2C including p-values:
+fig_2C_alt <- ggplot(roc_df_CD)+
+  geom_line(aes(x=FPR, y=TPR, color=as.factor(time)))+
+  geom_abline(intercept=0, slope=1, color="grey50", linetype="dashed")+
+  theme_classic()+labs(color="Time interval")+
+  theme(text = element_text(family="sans", size=8), legend.position = "bottom")
+
+```
+
+For UC:
+```{r}
+#Randomly split df1 into training (80%) and validation (20%):
+df1_UC <- df1_UC %>% select(IBD,C_KON,age,crp_trans, neutro_trans, mono_trans, throm_trans,hemo_trans,eos_trans, LABORATORIUM_IDCODE)
+df1_UC$IBD <- as.factor(df1_UC$IBD)
+
+set.seed(0)
+ind <- sample(2, nrow(df1_UC), replace=T, prob=c(0.8, 0.2))
+train_df <- df1_UC[ind==1,]
+test_df_UC <- df1_UC[ind==2,]
+
+#Grid search:
+control <- trainControl(method = "repeatedcv", number=10, repeats=3)
+metric = "Accuracy"
+customRF <- list(type = "Classification", library = "randomForest", loop=NULL)
+customRF$parameters <- data.frame(parameter=c("mtry", "ntree"), class = rep("numeric", 2), label = c("mtry", "ntree"))
+customRF$grid <- function(x,y,len=NULL, search="grid"){}
+customRF$fit <- function(x,y,wts,param,lev,last,weights,classProbs, ...){
+  randomForest(x,y,mtry=param$mtry, ntree=param$ntree, ...)
+}
+customRF$predict <- function(modelFit, newdata, preProc=NULL, submodels=NULL)
+  predict(modelFit, newdata)
+customRF$prob <- function(modelFit, newdata, preProc=NULL, submodels=NULL)
+  predict(modelFit, newdata, type="prob")
+customRF$sort <- function(x) x[order(x[,1]),]
+customRF$levels <- function(x) x$classes
+
+#Grid search
+tunegrid <- expand.grid(.mtry=c(2, 4, 6, 8), .ntree=c(500, 1000, 1500, 2000, 2500))
+set.seed(0)
+custom <- train(IBD~., data=train_df, method=customRF, metric=metric, tuneGrid=tunegrid, trControl=control, na.action = na.omit)
+plot(custom)
+custom$results$Accuracy
+custom$finalModel
+
+#Finer grid search
+tunegrid <- expand.grid(.mtry=c(3, 4, 5), .ntree=c(100, 200, 300, 400, 500, 600, 700, 800, 900, 1000))
+set.seed(0)
+custom2 <- train(IBD~., data=train_df, method=customRF, metric=metric, tuneGrid=tunegrid, trControl=control, na.action = na.omit)
+plot(custom2)
+custom2$results$Accuracy
+custom2$finalModel
+best_mtry <- 3
+best_ntree <- 500
+
+
+#Save model:
+saveRDS(custom2, file= "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/RF_trained_model_UC.rds")
+
+custom2 <- readRDS(file= "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/RF_trained_model_UC.rds")
+
+#Predictions on all time intervals
+pred_1_UC <- as.data.frame(predict(custom2, test_df_UC, type="prob"))
+obs_1_UC <- ifelse(test_df_UC$IBD == "Control", 0, 1)
+perf_1_UC <- performance(prediction(pred_1_UC$UC, obs_1_UC), "tpr", "fpr")
+roc_1_UC <- data.frame(FPR = perf_1_UC@x.values, TPR = perf_1_UC@y.values)
+colnames(roc_1_UC) <- c("FPR", "TPR")
+auc_1_UC <- performance(prediction(pred_1_UC$UC, obs_1_UC), "auc")
+auc_1_UC <- auc_1_UC@y.values[[1]]
+auc_1_UC
+labels <- as.logical(obs_1_UC)
+pos <- pred_1_UC$UC[labels]
+neg <- pred_1_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 87320, p-value = 2.335e-10
+roc_1_UC$time <- "-1, AUC = 0.634, p-val = 2.3e-10"
+
+pred_2_UC <- as.data.frame(predict(custom2, df2_UC, type="prob"))
+obs_2_UC <- ifelse(df2_UC$IBD == "Control", 0, 1)
+perf_2_UC <- performance(prediction(pred_2_UC$UC, obs_2_UC), "tpr", "fpr")
+roc_2_UC <- data.frame(FPR = perf_2_UC@x.values, TPR = perf_2_UC@y.values)
+colnames(roc_2_UC) <- c("FPR", "TPR")
+auc_2_UC <- performance(prediction(pred_2_UC$UC, obs_2_UC), "auc")
+auc_2_UC <- auc_2_UC@y.values[[1]]
+auc_2_UC
+labels <- as.logical(obs_2_UC)
+pos <- pred_2_UC$UC[labels]
+neg <- pred_2_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 268986, p-value = 0.004048
+roc_2_UC$time <- "-2, AUC = 0.544, p-val = 4.0e-03"
+
+pred_3_UC <- as.data.frame(predict(custom2, df3_UC, type="prob"))
+obs_3_UC <- ifelse(df3_UC$IBD == "Control", 0, 1)
+perf_3_UC <- performance(prediction(pred_3_UC$UC, obs_3_UC), "tpr", "fpr")
+roc_3_UC <- data.frame(FPR = perf_3_UC@x.values, TPR = perf_3_UC@y.values)
+colnames(roc_3_UC) <- c("FPR", "TPR")
+auc_3_UC <- performance(prediction(pred_3_UC$UC, obs_3_UC), "auc")
+auc_3_UC <- auc_3_UC@y.values[[1]]
+auc_3_UC
+labels <- as.logical(obs_3_UC)
+pos <- pred_3_UC$UC[labels]
+neg <- pred_3_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 165368, p-value = 0.0002139
+roc_3_UC$time <- "-3, AUC = 0.565, p-val = 2.1e-04"
+
+pred_4_UC <- as.data.frame(predict(custom2, df4_UC, type="prob"))
+obs_4_UC <- ifelse(df4_UC$IBD == "Control", 0, 1)
+perf_4_UC <- performance(prediction(pred_4_UC$UC, obs_4_UC), "tpr", "fpr")
+roc_4_UC <- data.frame(FPR = perf_4_UC@x.values, TPR = perf_4_UC@y.values)
+colnames(roc_4_UC) <- c("FPR", "TPR")
+auc_4_UC <- performance(prediction(pred_4_UC$UC, obs_4_UC), "auc")
+auc_4_UC <- auc_4_UC@y.values[[1]]
+auc_4_UC
+labels <- as.logical(obs_4_UC)
+pos <- pred_4_UC$UC[labels]
+neg <- pred_4_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 81569, p-value = 4.527e-05
+roc_4_UC$time <- "-4, AUC = 0.586, p-val = 4.5e-05"
+
+pred_5_UC <- as.data.frame(predict(custom2, df5_UC, type="prob"))
+obs_5_UC <- ifelse(df5_UC$IBD == "Control", 0, 1)
+perf_5_UC <- performance(prediction(pred_5_UC$UC, obs_5_UC), "tpr", "fpr")
+roc_5_UC <- data.frame(FPR = perf_5_UC@x.values, TPR = perf_5_UC@y.values)
+colnames(roc_5_UC) <- c("FPR", "TPR")
+auc_5_UC <- performance(prediction(pred_5_UC$UC, obs_5_UC), "auc")
+auc_5_UC <- auc_5_UC@y.values[[1]]
+auc_5_UC
+labels <- as.logical(obs_5_UC)
+pos <- pred_5_UC$UC[labels]
+neg <- pred_5_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 42243, p-value = 0.01113
+roc_5_UC$time <- "-5, AUC = 0.563, p-val = 0.01"
+
+pred_6_UC <- as.data.frame(predict(custom2, df6_UC, type="prob"))
+obs_6_UC <- ifelse(df6_UC$IBD == "Control", 0, 1)
+perf_6_UC <- performance(prediction(pred_6_UC$UC, obs_6_UC), "tpr", "fpr")
+roc_6_UC <- data.frame(FPR = perf_6_UC@x.values, TPR = perf_6_UC@y.values)
+colnames(roc_6_UC) <- c("FPR", "TPR")
+auc_6_UC <- performance(prediction(pred_6_UC$UC, obs_6_UC), "auc")
+auc_6_UC <- auc_6_UC@y.values[[1]]
+auc_6_UC
+labels <- as.logical(obs_6_UC)
+pos <- pred_6_UC$UC[labels]
+neg <- pred_6_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 21287, p-value = 0.06393
+roc_6_UC$time <- "-6, AUC = 0.554, p-val = 0.06"
+
+pred_7_UC <- as.data.frame(predict(custom2, df7_UC, type="prob"))
+obs_7_UC <- ifelse(df7_UC$IBD == "Control", 0, 1)
+perf_7_UC <- performance(prediction(pred_7_UC$UC, obs_7_UC), "tpr", "fpr")
+roc_7_UC <- data.frame(FPR = perf_7_UC@x.values, TPR = perf_7_UC@y.values)
+colnames(roc_7_UC) <- c("FPR", "TPR")
+auc_7_UC <- performance(prediction(pred_7_UC$UC, obs_7_UC), "auc")
+auc_7_UC <- auc_7_UC@y.values[[1]]
+auc_7_UC
+labels <- as.logical(obs_7_UC)
+pos <- pred_7_UC$UC[labels]
+neg <- pred_7_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 9248, p-value = 0.07476
+roc_7_UC$time <- "-7, AUC = 0.564, p-val = 0.07"
+
+pred_8_UC <- as.data.frame(predict(custom2, df8_UC, type="prob"))
+obs_8_UC <- ifelse(df8_UC$IBD == "Control", 0, 1)
+perf_8_UC <- performance(prediction(pred_8_UC$UC, obs_8_UC), "tpr", "fpr")
+roc_8_UC <- data.frame(FPR = perf_8_UC@x.values, TPR = perf_8_UC@y.values)
+colnames(roc_8_UC) <- c("FPR", "TPR")
+auc_8_UC <- performance(prediction(pred_8_UC$UC, obs_8_UC), "auc")
+auc_8_UC <- auc_8_UC@y.values[[1]]
+auc_8_UC
+labels <- as.logical(obs_8_UC)
+pos <- pred_8_UC$UC[labels]
+neg <- pred_8_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 3414, p-value = 0.8655
+roc_8_UC$time <- "-8, AUC = 0.508, p-val = 0.87"
+
+pred_9_UC <- as.data.frame(predict(custom2, df9_UC, type="prob"))
+obs_9_UC <- ifelse(df9_UC$IBD == "Control", 0, 1)
+perf_9_UC <- performance(prediction(pred_9_UC$UC, obs_9_UC), "tpr", "fpr")
+roc_9_UC <- data.frame(FPR = perf_9_UC@x.values, TPR = perf_9_UC@y.values)
+colnames(roc_9_UC) <- c("FPR", "TPR")
+auc_9_UC <- performance(prediction(pred_9_UC$UC, obs_9_UC), "auc")
+auc_9_UC <- auc_9_UC@y.values[[1]]
+auc_9_UC
+labels <- as.logical(obs_9_UC)
+pos <- pred_9_UC$UC[labels]
+neg <- pred_9_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 762, p-value = 0.005384
+roc_9_UC$time <- "-9, AUC = 0.700, p-val = 0.01"
+
+roc_df_UC <- rbind(roc_1_UC, roc_2_UC, roc_3_UC, roc_4_UC, roc_5_UC, roc_6_UC, roc_7_UC, roc_8_UC, roc_9_UC)
+
+fig_2D <- ggplot(roc_df_UC)+
+  geom_line(aes(x=FPR, y=TPR, color=as.factor(time)))+
+  geom_abline(intercept=0, slope=1, color="grey50", linetype="dashed")+
+  theme_classic()+labs(color="Time interval")+
+  theme(text = element_text(family="sans", size=8))
+
+#Alternative to figure 2D including p-values:
+fig_2D_alt <- ggplot(roc_df_UC)+
+  geom_line(aes(x=FPR, y=TPR, color=as.factor(time)))+
+  geom_abline(intercept=0, slope=1, color="grey50", linetype="dashed")+
+  theme_classic()+labs(color="Time interval")+
+  theme(text = element_text(family="sans", size=8), legend.position = "bottom")
+
+
+df_sum_UC <- data.frame(Time_interval = -1:-9, AUC = c(auc_1_UC,auc_2_UC, auc_3_UC, auc_4_UC, auc_5_UC, auc_6_UC, auc_7_UC, auc_8_UC, auc_9_UC), N = c(742, 1406,1082,746,558,392,256,164,66))
+
+df_sum_CD$IBD <- "CD"
+df_sum_UC$IBD <- "UC"
+df_sum <- rbind(df_sum_CD, df_sum_UC)
+
+hue_pal()(2)
+
+fig_test <- ggplot(df_sum, aes(x=as.factor(Time_interval), group=IBD))+
+  geom_line(aes(y=AUC, linetype=IBD))+
+  scale_y_continuous(name="AUC", sec.axis = sec_axis(trans=~.*2000, name="N"))+
+  theme_classic()+xlab("Time interval")+theme(axis.title.y = element_text(color="#F8766D"), axis.title.y.right = element_text(color="#00BFC4"))+
+  theme(text = element_text(family="sans", size=8))
+
+leg <- get_legend(fig_test)
+
+fig_2B <- ggplot(df_sum, aes(x=as.factor(Time_interval), group=IBD))+
+  geom_line(aes(y=AUC, linetype=IBD), color="#F8766D")+
+  geom_line(aes(y=N/2000, linetype=IBD), color="#00BFC4")+
+  scale_y_continuous(name="AUC", sec.axis = sec_axis(trans=~.*2000, name="N"))+
+  theme_classic()+xlab("Time interval")+theme(axis.title.y = element_text(color="#F8766D"), axis.title.y.right = element_text(color="#00BFC4"))+
+  theme(text = element_text(family="sans", size=8), legend.position = "none")
+
+fig_2B <- ggarrange(fig_2B,leg, widths = c(1, 0.15))
+
+#Gather figure 2:
+fig_2A
+fig_2B
+fig_2C_alt+guides(color=guide_legend(nrow = 3))
+fig_2D_alt
+
+fig_2AB <- ggarrange(fig_2A, fig_2B, labels=c("A)", "B)"), font.label = list(size=10, family="sans"))
+
+fig_2CD <- ggarrange(fig_2C_alt+guides(color=guide_legend(nrow = 5))+labs(color=""), fig_2D_alt+guides(color=guide_legend(nrow = 5))+labs(color=""), labels=c("C)", "D)"), font.label = list(size=10, family="sans"))
+
+fig_2 <- ggarrange(fig_2AB, fig_2CD, ncol=1, nrow=2, heights = c(0.5,1))
+
+ggsave(fig_2, filename="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/illustrations/Figure_2_alt.tiff", width = 180, height = 150, units="mm", dpi=300)
+
+```
+
+
+Make SVM model:
+CD:
+```{r}
+#Randomly split df1 into training (80%) and validation (20%):
+df1_CD <- df1_CD %>% select(IBD,C_KON,age,crp_trans, neutro_trans, mono_trans, throm_trans,hemo_trans,eos_trans, LABORATORIUM_IDCODE)
+df1_CD$IBD <- as.factor(df1_CD$IBD)
+
+set.seed(0)
+ind <- sample(2, nrow(df1_CD), replace=T, prob=c(0.8, 0.2))
+train_df <- df1_CD[ind==1,]
+test_df_CD <- df1_CD[ind==2,]
+
+#Scale dataset
+train_df[,c(3:9)] <- scale(train_df[,c(3:9)])
+test_df_CD[,c(3:9)] <- scale(test_df_CD[,c(3:9)])
+
+#Grid search for C and sigma:
+control <- trainControl(method = "repeatedcv", number=10, repeats=3, classProbs = T)
+metric = "Accuracy"
+
+#Grid search
+tunegrid <- expand.grid(.C=c(0.001, 0.01, 0.1, 1, 10, 100), .sigma=c(0.001, 0.01, 0.1, 1, 10, 100))
+set.seed(0)
+custom <- train(IBD~., data=train_df, method="svmRadial", metric=metric, tuneGrid=tunegrid, trControl=control, na.action = na.omit)
+plot(custom)
+custom$results$Accuracy
+custom$finalModel
+
+#Finer grid search
+tunegrid <- expand.grid(.C=c(2, 5, 10, 25, 50, 75), .sigma=c(0.0001, 0.0002, 0.0005, 0.0008, 0.001))
+set.seed(0)
+custom2 <- train(IBD~., data=train_df, method="svmRadial", metric=metric, tuneGrid=tunegrid, trControl=control, na.action = na.omit)
+plot(custom2)
+max(custom2$results$Accuracy) #[1] 0.7090363
+custom2$finalModel
+best_c <- 75
+best_sigma <- 2e-04
+
+#Save model:
+saveRDS(custom2, file= "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/SVM_trained_model_CD.rds")
+
+custom2 <- readRDS(file= "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/SVM_trained_model_CD.rds")
+
+
+#Predictions on all time intervals
+pred_1_CD <- as.data.frame(predict(custom2, test_df_CD, type="prob"))
+obs_1_CD <- ifelse(test_df_CD$IBD == "Control", 0, 1)
+perf_1_CD <- performance(prediction(pred_1_CD$CD, obs_1_CD), "tpr", "fpr")
+roc_1_CD <- data.frame(FPR = perf_1_CD@x.values, TPR = perf_1_CD@y.values)
+colnames(roc_1_CD) <- c("FPR", "TPR")
+auc_1_CD <- performance(prediction(pred_1_CD$CD, obs_1_CD), "auc")
+auc_1_CD <- auc_1_CD@y.values[[1]]
+auc_1_CD
+labels <- as.logical(obs_1_CD)
+pos <- pred_1_CD$CD[labels]
+neg <- pred_1_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 42078, p-value < 2.2e-16
+roc_1_CD$time <- "-1, AUC = 0.740, p-val < 2.2e-16"
+
+
+pred_2_CD <- as.data.frame(predict(custom2, df2_CD_sub, type="prob"))
+obs_2_CD <- ifelse(df2_CD_sub$IBD == "Control", 0, 1)
+perf_2_CD <- performance(prediction(pred_2_CD$CD, obs_2_CD), "tpr", "fpr")
+roc_2_CD <- data.frame(FPR = perf_2_CD@x.values, TPR = perf_2_CD@y.values)
+colnames(roc_2_CD) <- c("FPR", "TPR")
+auc_2_CD <- performance(prediction(pred_2_CD$CD, obs_2_CD), "auc")
+auc_2_CD <- auc_2_CD@y.values[[1]]
+auc_2_CD
+labels <- as.logical(obs_2_CD)
+pos <- pred_2_CD$CD[labels]
+neg <- pred_2_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 126849, p-value = 4.786e-05
+roc_2_CD$time <- "-2, AUC = 0.577, p-val = 4.8e-05"
+
+
+pred_3_CD <- as.data.frame(predict(custom2, df3_CD, type="prob"))
+obs_3_CD <- ifelse(df3_CD$IBD == "Control", 0, 1)
+perf_3_CD <- performance(prediction(pred_3_CD$CD, obs_3_CD), "tpr", "fpr")
+roc_3_CD <- data.frame(FPR = perf_3_CD@x.values, TPR = perf_3_CD@y.values)
+colnames(roc_3_CD) <- c("FPR", "TPR")
+auc_3_CD <- performance(prediction(pred_3_CD$CD, obs_3_CD), "auc")
+auc_3_CD <- auc_3_CD@y.values[[1]]
+auc_3_CD
+labels <- as.logical(obs_3_CD)
+pos <- pred_3_CD$CD[labels]
+neg <- pred_3_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 70006, p-value = 0.002836
+roc_3_CD$time <- "-3, AUC = 0.565, p-val = 2.8e-03"
+
+pred_4_CD <- as.data.frame(predict(custom2, df4_CD, type="prob"))
+obs_4_CD <- ifelse(df4_CD$IBD == "Control", 0, 1)
+perf_4_CD <- performance(prediction(pred_4_CD$CD, obs_4_CD), "tpr", "fpr")
+roc_4_CD <- data.frame(FPR = perf_4_CD@x.values, TPR = perf_4_CD@y.values)
+colnames(roc_4_CD) <- c("FPR", "TPR")
+auc_4_CD <- performance(prediction(pred_4_CD$CD, obs_4_CD), "auc")
+auc_4_CD <- auc_4_CD@y.values[[1]]
+auc_4_CD
+labels <- as.logical(obs_4_CD)
+pos <- pred_4_CD$CD[labels]
+neg <- pred_4_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 36609, p-value = 0.001671
+roc_4_CD$time <- "-4, AUC = 0.581, p-val = 1.7e-03"
+
+pred_5_CD <- as.data.frame(predict(custom2, df5_CD, type="prob"))
+obs_5_CD <- ifelse(df5_CD$IBD == "Control", 0, 1)
+perf_5_CD <- performance(prediction(pred_5_CD$CD, obs_5_CD), "tpr", "fpr")
+roc_5_CD <- data.frame(FPR = perf_5_CD@x.values, TPR = perf_5_CD@y.values)
+colnames(roc_5_CD) <- c("FPR", "TPR")
+auc_5_CD <- performance(prediction(pred_5_CD$CD, obs_5_CD), "auc")
+auc_5_CD <- auc_5_CD@y.values[[1]]
+auc_5_CD
+labels <- as.logical(obs_5_CD)
+pos <- pred_5_CD$CD[labels]
+neg <- pred_5_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 19691, p-value = 0.02105
+roc_5_CD$time <- "-5, AUC = 0.569, p-val = 0.021"
+
+pred_6_CD <- as.data.frame(predict(custom2, df6_CD, type="prob"))
+obs_6_CD <- ifelse(df6_CD$IBD == "Control", 0, 1)
+perf_6_CD <- performance(prediction(pred_6_CD$CD, obs_6_CD), "tpr", "fpr")
+roc_6_CD <- data.frame(FPR = perf_6_CD@x.values, TPR = perf_6_CD@y.values)
+colnames(roc_6_CD) <- c("FPR", "TPR")
+auc_6_CD <- performance(prediction(pred_6_CD$CD, obs_6_CD), "auc")
+auc_6_CD <- auc_6_CD@y.values[[1]]
+auc_6_CD
+labels <- as.logical(obs_6_CD)
+pos <- pred_6_CD$CD[labels]
+neg <- pred_6_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 9290, p-value = 0.01949
+roc_6_CD$time <- "-6, AUC = 0.585, p-val = 0.019"
+
+pred_7_CD <- as.data.frame(predict(custom2, df7_CD_sub, type="prob"))
+obs_7_CD <- ifelse(df7_CD_sub$IBD == "Control", 0, 1)
+perf_7_CD <- performance(prediction(pred_7_CD$CD, obs_7_CD), "tpr", "fpr")
+roc_7_CD <- data.frame(FPR = perf_7_CD@x.values, TPR = perf_7_CD@y.values)
+colnames(roc_7_CD) <- c("FPR", "TPR")
+auc_7_CD <- performance(prediction(pred_7_CD$CD, obs_7_CD), "auc")
+auc_7_CD <- auc_7_CD@y.values[[1]]
+auc_7_CD
+labels <- as.logical(obs_7_CD)
+pos <- pred_7_CD$CD[labels]
+neg <- pred_7_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 4090, p-value = 0.8881
+roc_7_CD$time <- "-7, AUC = 0.494, p-val = 0.888"
+
+pred_8_CD <- as.data.frame(predict(custom2, df8_CD_sub, type="prob"))
+obs_8_CD <- ifelse(df8_CD_sub$IBD == "Control", 0, 1)
+perf_8_CD <- performance(prediction(pred_8_CD$CD, obs_8_CD), "tpr", "fpr")
+roc_8_CD <- data.frame(FPR = perf_8_CD@x.values, TPR = perf_8_CD@y.values)
+colnames(roc_8_CD) <- c("FPR", "TPR")
+auc_8_CD <- performance(prediction(pred_8_CD$CD, obs_8_CD), "auc")
+auc_8_CD <- auc_8_CD@y.values[[1]]
+auc_8_CD
+labels <- as.logical(obs_8_CD)
+pos <- pred_8_CD$CD[labels]
+neg <- pred_8_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 618, p-value = 0.6302
+roc_8_CD$time <- "-8, AUC = 0.534, p-val = 0.630"
+
+pred_9_CD <- as.data.frame(predict(custom2, df9_CD, type="prob"))
+obs_9_CD <- ifelse(df9_CD$IBD == "Control", 0, 1)
+perf_9_CD <- performance(prediction(pred_9_CD$CD, obs_9_CD), "tpr", "fpr")
+roc_9_CD <- data.frame(FPR = perf_9_CD@x.values, TPR = perf_9_CD@y.values)
+colnames(roc_9_CD) <- c("FPR", "TPR")
+auc_9_CD <- performance(prediction(pred_9_CD$CD, obs_9_CD), "auc")
+auc_9_CD <- auc_9_CD@y.values[[1]]
+auc_9_CD
+labels <- as.logical(obs_9_CD)
+pos <- pred_9_CD$CD[labels]
+neg <- pred_9_CD$CD[!labels]
+wilcox.test(pos, neg) #W = 147, p-value = 0.6503
+roc_9_CD$time <- "-9, AUC = 0.454, p-val = 0.650"
+
+roc_df_CD <- rbind(roc_1_CD, roc_2_CD, roc_3_CD, roc_4_CD, roc_5_CD, roc_6_CD, roc_7_CD, roc_8_CD, roc_9_CD)
+
+
+#Figure S5:
+fig_S5_CD <- ggplot(roc_df_CD)+
+  geom_line(aes(x=FPR, y=TPR, color=as.factor(time)))+
+  geom_abline(intercept=0, slope=1, color="grey50", linetype="dashed")+
+  theme_classic()+labs(color="Time interval")+
+  theme(text = element_text(family="sans", size=8), legend.position = "bottom")
+```
+
+UC:
+```{r}
+#Randomly split df1 into training (80%) and validation (20%):
+df1_UC <- df1_UC %>% select(IBD,C_KON,age,crp_trans, neutro_trans, mono_trans, throm_trans,hemo_trans,eos_trans, LABORATORIUM_IDCODE)
+df1_UC$IBD <- as.factor(df1_UC$IBD)
+
+set.seed(0)
+ind <- sample(2, nrow(df1_UC), replace=T, prob=c(0.8, 0.2))
+train_df <- df1_UC[ind==1,]
+test_df_UC <- df1_UC[ind==2,]
+
+#Scale dataset
+train_df[,c(3:9)] <- scale(train_df[,c(3:9)])
+test_df_UC[,c(3:9)] <- scale(test_df_UC[,c(3:9)])
+
+#Grid search for C and sigma:
+control <- trainControl(method = "repeatedcv", number=10, repeats=3, classProbs = T)
+metric = "Accuracy"
+
+
+#Grid search
+tunegrid <- expand.grid(.C=c(0.001, 0.01, 0.1, 1, 10, 100), .sigma=c(0.001, 0.01, 0.1, 1, 10, 100))
+set.seed(0)
+custom <- train(IBD~., data=train_df, method="svmRadial", metric=metric, tuneGrid=tunegrid, trControl=control, na.action = na.omit)
+plot(custom)
+custom$results$Accuracy
+custom$finalModel
+
+#Finer grid search
+tunegrid <- expand.grid(.C=c(2, 5, 10, 25, 50, 75), .sigma=c(0.0001, 0.0002, 0.0005, 0.0008, 0.001))
+set.seed(0)
+custom2 <- train(IBD~., data=train_df, method="svmRadial", metric=metric, tuneGrid=tunegrid, trControl=control, na.action = na.omit)
+plot(custom2)
+max(custom2$results$Accuracy) #[1] 0.5940091
+custom2$finalModel
+best_c <- 75
+best_sigma <- 1e-04
+
+#Save model:
+saveRDS(custom2, file= "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/SVM_trained_model_UC.rds")
+
+custom2 <- readRDS(file= "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/SVM_trained_model_UC.rds")
+
+#Predictions on all time intervals
+pred_1_UC <- as.data.frame(predict(custom2, test_df_UC, type="prob"))
+obs_1_UC <- ifelse(test_df_UC$IBD == "Control", 0, 1)
+perf_1_UC <- performance(prediction(pred_1_UC$UC, obs_1_UC), "tpr", "fpr")
+roc_1_UC <- data.frame(FPR = perf_1_UC@x.values, TPR = perf_1_UC@y.values)
+colnames(roc_1_UC) <- c("FPR", "TPR")
+auc_1_UC <- performance(prediction(pred_1_UC$UC, obs_1_UC), "auc")
+auc_1_UC <- auc_1_UC@y.values[[1]]
+auc_1_UC
+labels <- as.logical(obs_1_UC)
+pos <- pred_1_UC$UC[labels]
+neg <- pred_1_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 88777, p-value = 8.105e-12
+roc_1_UC$time <- "-1, AUC = 0.645, p-val = 8.1e-12"
+
+pred_2_UC <- as.data.frame(predict(custom2, df2_UC, type="prob"))
+obs_2_UC <- ifelse(df2_UC$IBD == "Control", 0, 1)
+perf_2_UC <- performance(prediction(pred_2_UC$UC, obs_2_UC), "tpr", "fpr")
+roc_2_UC <- data.frame(FPR = perf_2_UC@x.values, TPR = perf_2_UC@y.values)
+colnames(roc_2_UC) <- c("FPR", "TPR")
+auc_2_UC <- performance(prediction(pred_2_UC$UC, obs_2_UC), "auc")
+auc_2_UC <- auc_2_UC@y.values[[1]]
+auc_2_UC
+labels <- as.logical(obs_2_UC)
+pos <- pred_2_UC$UC[labels]
+neg <- pred_2_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 258532, p-value = 0.1333
+roc_2_UC$time <- "-2, AUC = 0.523, p-val = 0.133"
+
+pred_3_UC <- as.data.frame(predict(custom2, df3_UC, type="prob"))
+obs_3_UC <- ifelse(df3_UC$IBD == "Control", 0, 1)
+perf_3_UC <- performance(prediction(pred_3_UC$UC, obs_3_UC), "tpr", "fpr")
+roc_3_UC <- data.frame(FPR = perf_3_UC@x.values, TPR = perf_3_UC@y.values)
+colnames(roc_3_UC) <- c("FPR", "TPR")
+auc_3_UC <- performance(prediction(pred_3_UC$UC, obs_3_UC), "auc")
+auc_3_UC <- auc_3_UC@y.values[[1]]
+auc_3_UC
+labels <- as.logical(obs_3_UC)
+pos <- pred_3_UC$UC[labels]
+neg <- pred_3_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 150781, p-value = 0.3876
+roc_3_UC$time <- "-3, AUC = 0.515, p-val = 0.388"
+
+pred_4_UC <- as.data.frame(predict(custom2, df4_UC, type="prob"))
+obs_4_UC <- ifelse(df4_UC$IBD == "Control", 0, 1)
+perf_4_UC <- performance(prediction(pred_4_UC$UC, obs_4_UC), "tpr", "fpr")
+roc_4_UC <- data.frame(FPR = perf_4_UC@x.values, TPR = perf_4_UC@y.values)
+colnames(roc_4_UC) <- c("FPR", "TPR")
+auc_4_UC <- performance(prediction(pred_4_UC$UC, obs_4_UC), "auc")
+auc_4_UC <- auc_4_UC@y.values[[1]]
+auc_4_UC
+labels <- as.logical(obs_4_UC)
+pos <- pred_4_UC$UC[labels]
+neg <- pred_4_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 75402, p-value = 0.04732
+roc_4_UC$time <- "-4, AUC = 0.542, p-val = 0.047"
+
+pred_5_UC <- as.data.frame(predict(custom2, df5_UC, type="prob"))
+obs_5_UC <- ifelse(df5_UC$IBD == "Control", 0, 1)
+perf_5_UC <- performance(prediction(pred_5_UC$UC, obs_5_UC), "tpr", "fpr")
+roc_5_UC <- data.frame(FPR = perf_5_UC@x.values, TPR = perf_5_UC@y.values)
+colnames(roc_5_UC) <- c("FPR", "TPR")
+auc_5_UC <- performance(prediction(pred_5_UC$UC, obs_5_UC), "auc")
+auc_5_UC <- auc_5_UC@y.values[[1]]
+auc_5_UC
+labels <- as.logical(obs_5_UC)
+pos <- pred_5_UC$UC[labels]
+neg <- pred_5_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 39660, p-value = 0.2523
+roc_5_UC$time <- "-5, AUC = 0.528, p-val = 0.252"
+
+pred_6_UC <- as.data.frame(predict(custom2, df6_UC, type="prob"))
+obs_6_UC <- ifelse(df6_UC$IBD == "Control", 0, 1)
+perf_6_UC <- performance(prediction(pred_6_UC$UC, obs_6_UC), "tpr", "fpr")
+roc_6_UC <- data.frame(FPR = perf_6_UC@x.values, TPR = perf_6_UC@y.values)
+colnames(roc_6_UC) <- c("FPR", "TPR")
+auc_6_UC <- performance(prediction(pred_6_UC$UC, obs_6_UC), "auc")
+auc_6_UC <- auc_6_UC@y.values[[1]]
+auc_6_UC
+labels <- as.logical(obs_6_UC)
+pos <- pred_6_UC$UC[labels]
+neg <- pred_6_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 20368, p-value = 0.3013
+roc_6_UC$time <- "-6, AUC = 0.530, p-val = 0.301"
+
+pred_7_UC <- as.data.frame(predict(custom2, df7_UC, type="prob"))
+obs_7_UC <- ifelse(df7_UC$IBD == "Control", 0, 1)
+perf_7_UC <- performance(prediction(pred_7_UC$UC, obs_7_UC), "tpr", "fpr")
+roc_7_UC <- data.frame(FPR = perf_7_UC@x.values, TPR = perf_7_UC@y.values)
+colnames(roc_7_UC) <- c("FPR", "TPR")
+auc_7_UC <- performance(prediction(pred_7_UC$UC, obs_7_UC), "auc")
+auc_7_UC <- auc_7_UC@y.values[[1]]
+auc_7_UC
+labels <- as.logical(obs_7_UC)
+pos <- pred_7_UC$UC[labels]
+neg <- pred_7_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 8710, p-value = 0.3823
+roc_7_UC$time <- "-7, AUC = 0.532, p-val = 0.382"
+
+pred_8_UC <- as.data.frame(predict(custom2, df8_UC, type="prob"))
+obs_8_UC <- ifelse(df8_UC$IBD == "Control", 0, 1)
+perf_8_UC <- performance(prediction(pred_8_UC$UC, obs_8_UC), "tpr", "fpr")
+roc_8_UC <- data.frame(FPR = perf_8_UC@x.values, TPR = perf_8_UC@y.values)
+colnames(roc_8_UC) <- c("FPR", "TPR")
+auc_8_UC <- performance(prediction(pred_8_UC$UC, obs_8_UC), "auc")
+auc_8_UC <- auc_8_UC@y.values[[1]]
+auc_8_UC
+labels <- as.logical(obs_8_UC)
+pos <- pred_8_UC$UC[labels]
+neg <- pred_8_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 3233, p-value = 0.6726
+roc_8_UC$time <- "-8, AUC = 0.481, p-val = 0.673"
+
+pred_9_UC <- as.data.frame(predict(custom2, df9_UC, type="prob"))
+obs_9_UC <- ifelse(df9_UC$IBD == "Control", 0, 1)
+perf_9_UC <- performance(prediction(pred_9_UC$UC, obs_9_UC), "tpr", "fpr")
+roc_9_UC <- data.frame(FPR = perf_9_UC@x.values, TPR = perf_9_UC@y.values)
+colnames(roc_9_UC) <- c("FPR", "TPR")
+auc_9_UC <- performance(prediction(pred_9_UC$UC, obs_9_UC), "auc")
+auc_9_UC <- auc_9_UC@y.values[[1]]
+auc_9_UC
+labels <- as.logical(obs_9_UC)
+pos <- pred_9_UC$UC[labels]
+neg <- pred_9_UC$UC[!labels]
+wilcox.test(pos, neg) #W = 637, p-value = 0.2398
+roc_9_UC$time <- "-9, AUC = 0.585, p-val = 0.240"
+
+roc_df_UC <- rbind(roc_1_UC, roc_2_UC, roc_3_UC, roc_4_UC, roc_5_UC, roc_6_UC, roc_7_UC, roc_8_UC, roc_9_UC)
+
+#For figure S5s:
+fig_S5_UC <- ggplot(roc_df_UC)+
+  geom_line(aes(x=FPR, y=TPR, color=as.factor(time)))+
+  geom_abline(intercept=0, slope=1, color="grey50", linetype="dashed")+
+  theme_classic()+labs(color="Time interval")+
+  theme(text = element_text(family="sans", size=8), legend.position = "bottom")
+
+
+#Gather figure S5:
+fig_S5 <- ggarrange(fig_S5_CD+guides(color=guide_legend(nrow = 5))+labs(color=""), fig_S5_UC+guides(color=guide_legend(nrow = 5))+labs(color=""), labels=c("A)", "B)"), font.label = list(size=10, family="sans"))
+
+ggsave(fig_S5, filename="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/illustrations/Figure_S5.tiff", width = 180, height = 150, units="mm", dpi=300)
+
+```
+

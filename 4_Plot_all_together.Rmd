@@ -1,0 +1,2381 @@
+---
+title: "Untitled"
+output: html_document
+date: '2022-06-17'
+editor_options: 
+  chunk_output_type: console
+---
+
+Read in packages:
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
+```
+
+## Plot tile plots (for figure S3A)
+
+Figure S3A: Tile plot of overall results:
+```{r}
+#CD:
+all_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Overall_results_CD_onlyGP.txt", sep="\t")
+head(all_CD)
+all_CD$p.value <- gsub("<2e-16", 2e-16, all_CD$p.value)
+
+CD_diag <- all_CD %>% filter(Test == "Diagnosis")
+CD_inter <- all_CD %>% filter(Test == "Time*Diagnosis")
+
+CD_diag$p_adj <- p.adjust(CD_diag$p.value, method = "BH")
+CD_inter$p_adj <- p.adjust(CD_inter$p.value, method = "BH")
+
+#UC:
+all_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Overall_results_UC_onlyGP.txt", sep="\t")
+
+all_UC$p.value <- gsub("<2e-16", 2e-16, all_UC$p.value)
+
+UC_diag <- all_UC %>% filter(Test == "Diagnosis")
+UC_inter <- all_UC %>% filter(Test == "Time*Diagnosis")
+
+UC_diag$p_adj <- p.adjust(UC_diag$p.value, method = "BH")
+UC_inter$p_adj <- p.adjust(UC_inter$p.value, method = "BH")
+
+#Combined CD and UC:
+CD_diag$Diagnosis <- "CD"
+CD_inter$Diagnosis <- "CD"
+UC_diag$Diagnosis <- "UC"
+UC_inter$Diagnosis <- "UC"
+
+diag_all <- rbind(CD_diag, UC_diag)
+inter_all <- rbind(CD_inter, UC_inter)
+
+diag_all$sig <- ifelse(diag_all$p_adj<0.001, "***", ifelse(diag_all$p_adj<0.01, "**", ifelse(diag_all$p_adj<0.05, "*", "ns")))
+inter_all$sig <- ifelse(inter_all$p_adj<0.001, "***", ifelse(inter_all$p_adj<0.01, "**", ifelse(inter_all$p_adj<0.05, "*", "ns")))
+
+bl <- colorRampPalette(c("navy","royalblue","lightskyblue"))(200)   
+re <- colorRampPalette(c("mistyrose", "red2","darkred"))(200)
+
+min(inter_all$t.value)
+max(inter_all$t.value)
+min(diag_all$t.value)
+max(diag_all$t.value)
+
+diag_all <- diag_all %>% filter(!(Clinical.feature %in% c("ESR", "ASAT")))
+inter_all <- inter_all %>% filter(!(Clinical.feature %in% c("ESR", "ASAT")))
+
+var_order <- c("Bilirubin", "Albumin", "ALAT", "Vitamin D2+D3", "Vitamin B12", "Folate", "Iron", "Hemoglobin", "Platelets", "Basophils", "Eosinophils", "Monocytes", "Lymphocytes", "Neutrophils", "Leukocytes", "F-cal", "ESR", "CRP")
+diag_all$Clinical.feature <- factor(diag_all$Clinical.feature, levels=var_order)
+inter_all$Clinical.feature <- factor(inter_all$Clinical.feature, levels=var_order)
+
+p1 <- ggplot(diag_all)+
+  geom_tile(aes(x=Diagnosis, y=Clinical.feature, fill = t.value))+
+  geom_text(aes(x=Diagnosis, y=Clinical.feature, label=sig), family="sans", size=3)+
+  theme_classic()+xlab("")+ylab("")+ scale_fill_gradientn(colours=c(bl, re), na.value = "black", limits = c(-56, 56))+ggtitle("Diagnosis")+labs(fill="t-value")+
+  theme(text = element_text(family="sans", size=8))
+
+p2 <- ggplot(inter_all)+
+  geom_tile(aes(x=Diagnosis, y=Clinical.feature, fill = t.value))+
+  geom_text(aes(x=Diagnosis, y=Clinical.feature, label=sig), family="sans", size=3)+
+  theme_classic()+xlab("")+ylab("")+ scale_fill_gradientn(colours=c(bl, re), na.value = "black", limits = c(-56,56))+ggtitle("Diagnosis*Time")+labs(fill="t-value")+
+  theme(text = element_text(family="sans", size=8))
+
+fig_S3A <- ggarrange(p1, p2, common.legend = T, legend = "right", labels=c("A)"), font.label = list(size=10, family="sans"))
+```
+
+## Figure 1A:
+
+Read in all results:
+```{r}
+#CRP
+crp_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/CRP_restable_CD_onlyGP.txt", sep=" ")
+crp_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/CRP_restable_UC_onlyGP.txt", sep=" ")
+
+crp_CD$Disease <- "CD"
+crp_UC$Disease <- "UC"
+crp_CD$p_adj <- p.adjust(crp_CD$p_value, method="BY")
+crp_UC$p_adj <- p.adjust(crp_UC$p_value, method="BY")
+crp <- rbind(crp_CD, crp_UC)
+
+#f-cal
+fcal_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Fcal_restable_CD_onlyGP.txt", sep=" ")
+fcal_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Fcal_restable_UC_onlyGP.txt", sep=" ")
+
+fcal_CD$Disease <- "CD"
+fcal_UC$Disease <- "UC"
+fcal_CD$p_adj <- p.adjust(fcal_CD$p_value, method="BY")
+fcal_UC$p_adj <- p.adjust(fcal_UC$p_value, method="BY")
+fcal <- rbind(fcal_CD, fcal_UC)
+
+#Hemo
+hemo_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Hemoglobin_restable_CD_onlyGP.txt", sep=" ")
+hemo_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Hemoglobin_restable_UC_onlyGP.txt", sep=" ")
+
+hemo_CD$Disease <- "CD"
+hemo_UC$Disease <- "UC"
+hemo_CD$p_adj <- p.adjust(hemo_CD$p_value, method="BY")
+hemo_UC$p_adj <- p.adjust(hemo_UC$p_value, method="BY")
+hemo <- rbind(hemo_CD, hemo_UC)
+
+#Leuko:
+leuko_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Leukocyt_restable_CD_onlyGP.txt", sep=" ")
+leuko_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Leukocyt_restable_UC_onlyGP.txt", sep=" ")
+
+leuko_CD$Disease <- "CD"
+leuko_UC$Disease <- "UC"
+leuko_CD$p_adj <- p.adjust(leuko_CD$p_value, method="BY")
+leuko_UC$p_adj <- p.adjust(leuko_UC$p_value, method="BY")
+leuko <- rbind(leuko_CD, leuko_UC)
+
+#Neutro:
+neutro_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Neutrocyt_restable_CD_onlyGP.txt", sep=" ")
+neutro_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Neutrocyt_restable_UC_onlyGP.txt", sep=" ")
+
+neutro_CD$Disease <- "CD"
+neutro_UC$Disease <- "UC"
+neutro_CD$p_adj <- p.adjust(neutro_CD$p_value, method="BY")
+neutro_UC$p_adj <- p.adjust(neutro_UC$p_value, method="BY")
+neutro <- rbind(neutro_CD, neutro_UC)
+
+#Lympho:
+lymfo_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Lymphocyt_restable_CD_onlyGP.txt", sep=" ")
+lymfo_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Lymphocyt_restable_UC_onlyGP.txt", sep=" ")
+
+lymfo_CD$Disease <- "CD"
+lymfo_UC$Disease <- "UC"
+lymfo_CD$p_adj <- p.adjust(lymfo_CD$p_value, method="BY")
+lymfo_UC$p_adj <- p.adjust(lymfo_UC$p_value, method="BY")
+lymfo <- rbind(lymfo_CD, lymfo_UC)
+
+#Mono:
+mono_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Monocyt_restable_CD_onlyGP.txt", sep=" ")
+mono_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Monocyt_restable_UC_onlyGP.txt", sep=" ")
+
+mono_CD$Disease <- "CD"
+mono_UC$Disease <- "UC"
+mono_CD$p_adj <- p.adjust(mono_CD$p_value, method="BY")
+mono_UC$p_adj <- p.adjust(mono_UC$p_value, method="BY")
+mono <- rbind(mono_CD, mono_UC)
+
+#Eos:
+eos_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Eosinophiles_restable_CD_onlyGP.txt", sep=" ")
+eos_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Eosinophiles_restable_UC_onlyGP.txt", sep=" ")
+
+eos_CD$Disease <- "CD"
+eos_UC$Disease <- "UC"
+eos_CD$p_adj <- p.adjust(eos_CD$p_value, method="BY")
+eos_UC$p_adj <- p.adjust(eos_UC$p_value, method="BY")
+eos <- rbind(eos_CD, eos_UC)
+
+#Baso:
+baso_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Basofile_restable_CD_onlyGP.txt", sep=" ")
+baso_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Basofile_restable_UC_onlyGP.txt", sep=" ")
+
+baso_CD$Disease <- "CD"
+baso_UC$Disease <- "UC"
+baso_CD$p_adj <- p.adjust(baso_CD$p_value, method="BY")
+baso_UC$p_adj <- p.adjust(baso_UC$p_value, method="BY")
+baso <- rbind(baso_CD, baso_UC)
+
+#Thrombo:
+throm_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Thrombocyt_restable_CD_onlyGP.txt", sep=" ")
+throm_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Thrombocyt_restable_UC_onlyGP.txt", sep=" ")
+
+throm_CD$Disease <- "CD"
+throm_UC$Disease <- "UC"
+throm_CD$p_adj <- p.adjust(throm_CD$p_value, method="BY")
+throm_UC$p_adj <- p.adjust(throm_UC$p_value, method="BY")
+throm <- rbind(throm_CD, throm_UC)
+
+#alb:
+alb_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Albumin_restable_CD_onlyGP.txt", sep=" ")
+alb_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Albumin_restable_UC_onlyGP.txt", sep=" ")
+
+alb_CD$Disease <- "CD"
+alb_UC$Disease <- "UC"
+alb_CD$p_adj <- p.adjust(alb_CD$p_value, method="BY")
+alb_UC$p_adj <- p.adjust(alb_UC$p_value, method="BY")
+alb <- rbind(alb_CD, alb_UC)
+
+#Iron:
+iron_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Iron_restable_CD_onlyGP.txt", sep=" ")
+iron_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Iron_restable_UC_onlyGP.txt", sep=" ")
+
+iron_CD$Disease <- "CD"
+iron_UC$Disease <- "UC"
+iron_CD$p_adj <- p.adjust(iron_CD$p_value, method="BY")
+iron_UC$p_adj <- p.adjust(iron_UC$p_value, method="BY")
+iron <- rbind(iron_CD, iron_UC)
+
+#VitB12:
+VitB12_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/VitB12_restable_CD_onlyGP.txt", sep=" ")
+VitB12_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/VitB12_restable_UC_onlyGP.txt", sep=" ")
+
+VitB12_CD$Disease <- "CD"
+VitB12_UC$Disease <- "UC"
+VitB12_CD$p_adj <- p.adjust(VitB12_CD$p_value, method="BY")
+VitB12_UC$p_adj <- p.adjust(VitB12_UC$p_value, method="BY")
+VitB12 <- rbind(VitB12_CD, VitB12_UC)
+
+#Folate:
+folate_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Folate_restable_CD_onlyGP.txt", sep=" ")
+folate_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Folate_restable_UC_onlyGP.txt", sep=" ")
+
+folate_CD$Disease <- "CD"
+folate_UC$Disease <- "UC"
+folate_CD$p_adj <- p.adjust(folate_CD$p_value, method="BY")
+folate_UC$p_adj <- p.adjust(folate_UC$p_value, method="BY")
+folate <- rbind(folate_CD, folate_UC)
+
+"ALAT:"
+ALAT_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/ALAT_restable_CD_onlyGP.txt", sep=" ")
+ALAT_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/ALAT_restable_UC_onlyGP.txt", sep=" ")
+
+ALAT_CD$Disease <- "CD"
+ALAT_UC$Disease <- "UC"
+ALAT_CD$p_adj <- p.adjust(ALAT_CD$p_value, method="BY")
+ALAT_UC$p_adj <- p.adjust(ALAT_UC$p_value, method="BY")
+ALAT <- rbind(ALAT_CD, ALAT_UC)
+
+#Bili:
+bili_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Bilirubin_restable_CD_onlyGP.txt", sep=" ")
+bili_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Bilirubin_restable_UC_onlyGP.txt", sep=" ")
+
+bili_CD$Disease <- "CD"
+bili_UC$Disease <- "UC"
+bili_CD$p_adj <- p.adjust(bili_CD$p_value, method="BY")
+bili_UC$p_adj <- p.adjust(bili_UC$p_value, method="BY")
+bili <- rbind(bili_CD, bili_UC)
+
+#VitD:
+vitd_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/VitD_restable_CD_onlyGP.txt", sep=" ")
+vitd_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/VitD_restable_UC_onlyGP.txt", sep=" ")
+
+vitd_CD$Disease <- "CD"
+vitd_UC$Disease <- "UC"
+vitd_CD$p_adj <- p.adjust(vitd_CD$p_value, method="BY")
+vitd_UC$p_adj <- p.adjust(vitd_UC$p_value, method="BY")
+vitd <- rbind(vitd_CD, vitd_UC)
+```
+
+Gather all in plot::
+```{r}
+# Collect all:
+crp$feature <- "CRP"
+fcal$feature <- "F-cal"
+hemo$feature <- "Hemoglobin"
+leuko$feature <- "Leukocytes"
+neutro$feature <- "Neutrophils"
+lymfo$feature <- "Lymphocytes"
+mono$feature <-  "Monocytes"
+eos$feature <- "Eosinophils"
+baso$feature <-  "Basophils"
+throm$feature <- "Platelets"
+alb$feature <- "Albumin"
+iron$feature <- "Iron"
+VitB12$feature <- "Vitamin B12"
+folate$feature <- "Folate"
+ALAT$feature <- "ALAT"
+bili$feature <- "Bilirubin"
+vitd$feature <- "Vitamin D2+D3"
+
+total <- rbind(crp, fcal, hemo, leuko, neutro, lymfo, mono, eos, baso, throm, alb, iron, VitB12, folate, ALAT, bili, vitd)
+total$sig <- ifelse(total$p_adj<0.001, "***", ifelse(total$p_adj<0.01, "**", ifelse(total$p_adj<0.05, "*", "ns")))
+
+write.table(total, "F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Overall_results_figure1.txt", quote=F, row.names=F)
+
+total_CD <- total %>% filter(Disease =="CD")
+total_UC <- total %>% filter(Disease =="UC")
+
+bl <- colorRampPalette(c("navy","royalblue","lightskyblue"))(200)   
+re <- colorRampPalette(c("mistyrose", "red2","darkred"))(200)
+
+min(total_CD$t_value)
+max(total_CD$t_value)
+min(total_UC$t_value)
+max(total_UC$t_value)
+
+total_CD$feature <- factor(total_CD$feature, levels=var_order)
+total_UC$feature <- factor(total_UC$feature, levels=var_order)
+
+total_CD$time_interval <- -total_CD$time_interval
+total_UC$time_interval <- -total_UC$time_interval
+
+q1 <- ggplot(data=total_CD, aes(x=as.factor(time_interval), y=feature, fill=t_value))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-58, 58))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Crohn's disease")+labs(fill="t-value")+
+  theme(text = element_text(family="sans", size=8))
+
+q2 <- ggplot(data=total_UC, aes(x=as.factor(time_interval), y=feature, fill=t_value))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-58, 58))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Ulcerative colitis")+labs(fill="t-value")+
+  theme(text = element_text(family="sans", size=8))
+
+fig_1A <- ggarrange(q1, q2, common.legend = T, legend="right", labels=c("A)"), font.label = list(size=10, family="sans"))
+
+
+#Alternative to figure 1A colored by beta-value and not t-value:
+min(total_CD$Estimate)
+max(total_CD$Estimate)
+min(total_UC$Estimate)
+max(total_UC$Estimate)
+
+total_CD$feature <- factor(total_CD$feature, levels=var_order)
+total_UC$feature <- factor(total_UC$feature, levels=var_order)
+
+total_CD$time_interval <- -total_CD$time_interval
+total_UC$time_interval <- -total_UC$time_interval
+
+q1 <- ggplot(data=total_CD, aes(x=as.factor(time_interval), y=feature, fill=Estimate))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-2.7, 2.7))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Crohn's disease")+labs(fill="Estimate")+
+  theme(text = element_text(family="sans", size=8))
+
+q2 <- ggplot(data=total_UC, aes(x=as.factor(time_interval), y=feature, fill=Estimate))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-2.7, 2.7))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Ulcerative colitis")+labs(fill="Estimate")+
+  theme(text = element_text(family="sans", size=8))
+
+fig_1A_alt <- ggarrange(q1, q2, common.legend = T, legend="right", labels=c("A)"), font.label = list(size=10, family="sans"))
+
+```
+
+## Figure S4A: Sensitivity analysis, 2 diagnosis
+```{r}
+#Read in all results and adjust p-values within the same feature
+#CRP
+crp_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_CRP_restable_CD_onlyGP.txt", sep=" ")
+crp_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_CRP_restable_UC_onlyGP.txt", sep=" ")
+
+crp_CD$Disease <- "CD"
+crp_UC$Disease <- "UC"
+crp_CD$p_adj <- p.adjust(crp_CD$p_value, method="BY")
+crp_UC$p_adj <- p.adjust(crp_UC$p_value, method="BY")
+crp <- rbind(crp_CD, crp_UC)
+
+#f-cal
+fcal_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Fcal_restable_CD_onlyGP.txt", sep=" ")
+fcal_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Fcal_restable_UC_onlyGP.txt", sep=" ")
+
+fcal_CD$Disease <- "CD"
+fcal_UC$Disease <- "UC"
+fcal_CD$p_adj <- p.adjust(fcal_CD$p_value, method="BY")
+fcal_UC$p_adj <- p.adjust(fcal_UC$p_value, method="BY")
+fcal <- rbind(fcal_CD, fcal_UC)
+
+#Hemo
+hemo_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Hemoglobin_restable_CD_onlyGP.txt", sep=" ")
+hemo_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Hemoglobin_restable_UC_onlyGP.txt", sep=" ")
+
+hemo_CD$Disease <- "CD"
+hemo_UC$Disease <- "UC"
+hemo_CD$p_adj <- p.adjust(hemo_CD$p_value, method="BY")
+hemo_UC$p_adj <- p.adjust(hemo_UC$p_value, method="BY")
+hemo <- rbind(hemo_CD, hemo_UC)
+
+#Leuko:
+leuko_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Leukocyt_restable_CD_onlyGP.txt", sep=" ")
+leuko_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Leukocyt_restable_UC_onlyGP.txt", sep=" ")
+
+leuko_CD$Disease <- "CD"
+leuko_UC$Disease <- "UC"
+leuko_CD$p_adj <- p.adjust(leuko_CD$p_value, method="BY")
+leuko_UC$p_adj <- p.adjust(leuko_UC$p_value, method="BY")
+leuko <- rbind(leuko_CD, leuko_UC)
+
+#Neutro:
+neutro_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Neutrocyt_restable_CD_onlyGP.txt", sep=" ")
+neutro_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Neutrocyt_restable_UC_onlyGP.txt", sep=" ")
+
+neutro_CD$Disease <- "CD"
+neutro_UC$Disease <- "UC"
+neutro_CD$p_adj <- p.adjust(neutro_CD$p_value, method="BY")
+neutro_UC$p_adj <- p.adjust(neutro_UC$p_value, method="BY")
+neutro <- rbind(neutro_CD, neutro_UC)
+
+#Lympho:
+lymfo_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Lymphocyt_restable_CD_onlyGP.txt", sep=" ")
+lymfo_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Lymphocyt_restable_UC_onlyGP.txt", sep=" ")
+
+lymfo_CD$Disease <- "CD"
+lymfo_UC$Disease <- "UC"
+lymfo_CD$p_adj <- p.adjust(lymfo_CD$p_value, method="BY")
+lymfo_UC$p_adj <- p.adjust(lymfo_UC$p_value, method="BY")
+lymfo <- rbind(lymfo_CD, lymfo_UC)
+
+#Mono:
+mono_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Monocyt_restable_CD_onlyGP.txt", sep=" ")
+mono_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Monocyt_restable_UC_onlyGP.txt", sep=" ")
+
+mono_CD$Disease <- "CD"
+mono_UC$Disease <- "UC"
+mono_CD$p_adj <- p.adjust(mono_CD$p_value, method="BY")
+mono_UC$p_adj <- p.adjust(mono_UC$p_value, method="BY")
+mono <- rbind(mono_CD, mono_UC)
+
+#Eos:
+eos_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Eosinophiles_restable_CD_onlyGP.txt", sep=" ")
+eos_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Eosinophiles_restable_UC_onlyGP.txt", sep=" ")
+
+eos_CD$Disease <- "CD"
+eos_UC$Disease <- "UC"
+eos_CD$p_adj <- p.adjust(eos_CD$p_value, method="BY")
+eos_UC$p_adj <- p.adjust(eos_UC$p_value, method="BY")
+eos <- rbind(eos_CD, eos_UC)
+
+#Baso:
+baso_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Basofile_restable_CD_onlyGP.txt", sep=" ")
+baso_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Basofile_restable_UC_onlyGP.txt", sep=" ")
+
+baso_CD$Disease <- "CD"
+baso_UC$Disease <- "UC"
+baso_CD$p_adj <- p.adjust(baso_CD$p_value, method="BY")
+baso_UC$p_adj <- p.adjust(baso_UC$p_value, method="BY")
+baso <- rbind(baso_CD, baso_UC)
+
+#Thrombo:
+throm_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Thrombocyt_restable_CD_onlyGP.txt", sep=" ")
+throm_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Thrombocyt_restable_UC_onlyGP.txt", sep=" ")
+
+throm_CD$Disease <- "CD"
+throm_UC$Disease <- "UC"
+throm_CD$p_adj <- p.adjust(throm_CD$p_value, method="BY")
+throm_UC$p_adj <- p.adjust(throm_UC$p_value, method="BY")
+throm <- rbind(throm_CD, throm_UC)
+
+#alb:
+alb_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Albumin_restable_CD_onlyGP.txt", sep=" ")
+alb_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Albumin_restable_UC_onlyGP.txt", sep=" ")
+
+alb_CD$Disease <- "CD"
+alb_UC$Disease <- "UC"
+alb_CD$p_adj <- p.adjust(alb_CD$p_value, method="BY")
+alb_UC$p_adj <- p.adjust(alb_UC$p_value, method="BY")
+alb <- rbind(alb_CD, alb_UC)
+
+#Iron:
+iron_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Iron_restable_CD_onlyGP.txt", sep=" ")
+iron_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Iron_restable_UC_onlyGP.txt", sep=" ")
+
+iron_CD$Disease <- "CD"
+iron_UC$Disease <- "UC"
+iron_CD$p_adj <- p.adjust(iron_CD$p_value, method="BY")
+iron_UC$p_adj <- p.adjust(iron_UC$p_value, method="BY")
+iron <- rbind(iron_CD, iron_UC)
+
+#VitB12:
+VitB12_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_VitB12_restable_CD_onlyGP.txt", sep=" ")
+VitB12_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_VitB12_restable_UC_onlyGP.txt", sep=" ")
+
+VitB12_CD$Disease <- "CD"
+VitB12_UC$Disease <- "UC"
+VitB12_CD$p_adj <- p.adjust(VitB12_CD$p_value, method="BY")
+VitB12_UC$p_adj <- p.adjust(VitB12_UC$p_value, method="BY")
+VitB12 <- rbind(VitB12_CD, VitB12_UC)
+
+#Folate:
+folate_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Folate_restable_CD_onlyGP.txt", sep=" ")
+folate_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Folate_restable_UC_onlyGP.txt", sep=" ")
+
+folate_CD$Disease <- "CD"
+folate_UC$Disease <- "UC"
+folate_CD$p_adj <- p.adjust(folate_CD$p_value, method="BY")
+folate_UC$p_adj <- p.adjust(folate_UC$p_value, method="BY")
+folate <- rbind(folate_CD, folate_UC)
+
+#ALAT:
+ALAT_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_ALAT_restable_CD_onlyGP.txt", sep=" ")
+ALAT_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_ALAT_restable_UC_onlyGP.txt", sep=" ")
+
+ALAT_CD$Disease <- "CD"
+ALAT_UC$Disease <- "UC"
+ALAT_CD$p_adj <- p.adjust(ALAT_CD$p_value, method="BY")
+ALAT_UC$p_adj <- p.adjust(ALAT_UC$p_value, method="BY")
+ALAT <- rbind(ALAT_CD, ALAT_UC)
+
+#Bili:
+bili_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Bilirubin_restable_CD_onlyGP.txt", sep=" ")
+bili_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_Bilirubin_restable_UC_onlyGP.txt", sep=" ")
+
+bili_CD$Disease <- "CD"
+bili_UC$Disease <- "UC"
+bili_CD$p_adj <- p.adjust(bili_CD$p_value, method="BY")
+bili_UC$p_adj <- p.adjust(bili_UC$p_value, method="BY")
+bili <- rbind(bili_CD, bili_UC)
+
+#VitD:
+vitd_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_VitD_restable_CD_onlyGP.txt", sep=" ")
+vitd_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Sensitivity_VitD_restable_UC_onlyGP.txt", sep=" ")
+
+vitd_CD$Disease <- "CD"
+vitd_UC$Disease <- "UC"
+vitd_CD$p_adj <- p.adjust(vitd_CD$p_value, method="BY")
+vitd_UC$p_adj <- p.adjust(vitd_UC$p_value, method="BY")
+vitd <- rbind(vitd_CD, vitd_UC)
+```
+
+Gather all in plot::
+```{r}
+# Collect all:
+crp$feature <- "CRP"
+fcal$feature <- "F-cal"
+hemo$feature <- "Hemoglobin"
+leuko$feature <- "Leukocytes"
+neutro$feature <- "Neutrophils"
+lymfo$feature <- "Lymphocytes"
+mono$feature <-  "Monocytes"
+eos$feature <- "Eosinophils"
+baso$feature <-  "Basophils"
+throm$feature <- "Platelets"
+alb$feature <- "Albumin"
+iron$feature <- "Iron"
+VitB12$feature <- "Vitamin B12"
+folate$feature <- "Folate"
+ALAT$feature <- "ALAT"
+bili$feature <- "Bilirubin"
+vitd$feature <- "Vitamin D2+D3"
+
+total <- rbind(crp, fcal, hemo, leuko, neutro, lymfo, mono, eos, baso, throm, alb, iron, VitB12, folate, ALAT, bili, vitd)
+total$sig <- ifelse(total$p_adj<0.001, "***", ifelse(total$p_adj<0.01, "**", ifelse(total$p_adj<0.05, "*", "ns")))
+
+total_CD <- total %>% filter(Disease =="CD")
+total_UC <- total %>% filter(Disease =="UC")
+
+bl <- colorRampPalette(c("navy","royalblue","lightskyblue"))(200)   
+re <- colorRampPalette(c("mistyrose", "red2","darkred"))(200)
+
+min(total_CD$t_value)
+max(total_CD$t_value)
+min(total_UC$t_value)
+max(total_UC$t_value)
+
+total_CD$feature <- factor(total_CD$feature, levels=var_order)
+total_UC$feature <- factor(total_UC$feature, levels=var_order)
+
+total_CD$time_interval <- -total_CD$time_interval
+total_UC$time_interval <- -total_UC$time_interval
+
+q1 <- ggplot(data=total_CD, aes(x=as.factor(time_interval), y=feature, fill=t_value))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-56, 56))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Crohn's disease")+labs(fill="t-value")+
+  theme(text = element_text(family="sans", size=8))
+
+q2 <- ggplot(data=total_UC, aes(x=as.factor(time_interval), y=feature, fill=t_value))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-56, 56))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Ulcerative colitis")+labs(fill="t-value")+
+  theme(text = element_text(family="sans", size=8))
+
+fig_S4A <- ggarrange(q1, q2, common.legend = T, legend="right", labels=c("A)"), font.label = list(size=10, family="sans"))
+
+#Alternative to figure S4A with estimates instead of t-values
+min(total_CD$Estimate)
+max(total_CD$Estimate)
+min(total_UC$Estimate)
+max(total_UC$Estimate)
+
+total_CD$feature <- factor(total_CD$feature, levels=var_order)
+total_UC$feature <- factor(total_UC$feature, levels=var_order)
+
+total_CD$time_interval <- -total_CD$time_interval
+total_UC$time_interval <- -total_UC$time_interval
+
+q1 <- ggplot(data=total_CD, aes(x=as.factor(time_interval), y=feature, fill=Estimate))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-3.5, 3.5))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Crohn's disease")+labs(fill="Estimate")+
+  theme(text = element_text(family="sans", size=8))
+
+q2 <- ggplot(data=total_UC, aes(x=as.factor(time_interval), y=feature, fill=Estimate))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-3.5, 3.5))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Ulcerative colitis")+labs(fill="Estimate")+
+  theme(text = element_text(family="sans", size=8))
+
+fig_S4A_alt <- ggarrange(q1, q2, common.legend = T, legend="right", labels=c("A)"), font.label = list(size=10, family="sans"))
+
+```
+
+## Figure S4C: Comorbidity analysis
+
+Read in all results:
+```{r}
+#CRP
+crp_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/CRP_restable_CD_comorb_onlyGP.txt", sep=" ")
+crp_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/CRP_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+crp_CD$Disease <- "CD"
+crp_UC$Disease <- "UC"
+crp_CD$p_adj <- p.adjust(crp_CD$p_value, method="BY")
+crp_UC$p_adj <- p.adjust(crp_UC$p_value, method="BY")
+crp <- rbind(crp_CD, crp_UC)
+
+#f-cal
+fcal_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Fcal_restable_CD_comorb_onlyGP.txt", sep=" ")
+fcal_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Fcal_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+fcal_CD$Disease <- "CD"
+fcal_UC$Disease <- "UC"
+fcal_CD$p_adj <- p.adjust(fcal_CD$p_value, method="BY")
+fcal_UC$p_adj <- p.adjust(fcal_UC$p_value, method="BY")
+fcal <- rbind(fcal_CD, fcal_UC)
+
+#Hemo
+hemo_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Hemoglobin_restable_CD_comorb_onlyGP.txt", sep=" ")
+hemo_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Hemoglobin_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+hemo_CD$Disease <- "CD"
+hemo_UC$Disease <- "UC"
+hemo_CD$p_adj <- p.adjust(hemo_CD$p_value, method="BY")
+hemo_UC$p_adj <- p.adjust(hemo_UC$p_value, method="BY")
+hemo <- rbind(hemo_CD, hemo_UC)
+
+#Leuko:
+leuko_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Leukocyt_restable_CD_comorb_onlyGP.txt", sep=" ")
+leuko_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Leukocyt_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+leuko_CD$Disease <- "CD"
+leuko_UC$Disease <- "UC"
+leuko_CD$p_adj <- p.adjust(leuko_CD$p_value, method="BY")
+leuko_UC$p_adj <- p.adjust(leuko_UC$p_value, method="BY")
+leuko <- rbind(leuko_CD, leuko_UC)
+
+#Neutro:
+neutro_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Neutrocyt_restable_CD_comorb_onlyGP.txt", sep=" ")
+neutro_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Neutrocyt_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+neutro_CD$Disease <- "CD"
+neutro_UC$Disease <- "UC"
+neutro_CD$p_adj <- p.adjust(neutro_CD$p_value, method="BY")
+neutro_UC$p_adj <- p.adjust(neutro_UC$p_value, method="BY")
+neutro <- rbind(neutro_CD, neutro_UC)
+
+#Lympho:
+lymfo_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Lymphocyt_restable_CD_comorb_onlyGP.txt", sep=" ")
+lymfo_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Lymphocyt_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+lymfo_CD$Disease <- "CD"
+lymfo_UC$Disease <- "UC"
+lymfo_CD$p_adj <- p.adjust(lymfo_CD$p_value, method="BY")
+lymfo_UC$p_adj <- p.adjust(lymfo_UC$p_value, method="BY")
+lymfo <- rbind(lymfo_CD, lymfo_UC)
+
+#Mono:
+mono_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Monocyt_restable_CD_comorb_onlyGP.txt", sep=" ")
+mono_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Monocyt_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+mono_CD$Disease <- "CD"
+mono_UC$Disease <- "UC"
+mono_CD$p_adj <- p.adjust(mono_CD$p_value, method="BY")
+mono_UC$p_adj <- p.adjust(mono_UC$p_value, method="BY")
+mono <- rbind(mono_CD, mono_UC)
+
+#Eos:
+eos_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Eosinophiles_restable_CD_comorb_onlyGP.txt", sep=" ")
+eos_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Eosinophiles_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+eos_CD$Disease <- "CD"
+eos_UC$Disease <- "UC"
+eos_CD$p_adj <- p.adjust(eos_CD$p_value, method="BY")
+eos_UC$p_adj <- p.adjust(eos_UC$p_value, method="BY")
+eos <- rbind(eos_CD, eos_UC)
+
+#Baso:
+baso_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Basofile_restable_CD_comorb_onlyGP.txt", sep=" ")
+baso_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Basofile_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+baso_CD$Disease <- "CD"
+baso_UC$Disease <- "UC"
+baso_CD$p_adj <- p.adjust(baso_CD$p_value, method="BY")
+baso_UC$p_adj <- p.adjust(baso_UC$p_value, method="BY")
+baso <- rbind(baso_CD, baso_UC)
+
+#Thrombo:
+throm_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Thrombocyt_restable_CD_comorb_onlyGP.txt", sep=" ")
+throm_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Thrombocyt_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+throm_CD$Disease <- "CD"
+throm_UC$Disease <- "UC"
+throm_CD$p_adj <- p.adjust(throm_CD$p_value, method="BY")
+throm_UC$p_adj <- p.adjust(throm_UC$p_value, method="BY")
+throm <- rbind(throm_CD, throm_UC)
+
+#alb:
+alb_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Albumin_restable_CD_comorb_onlyGP.txt", sep=" ")
+alb_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Albumin_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+alb_CD$Disease <- "CD"
+alb_UC$Disease <- "UC"
+alb_CD$p_adj <- p.adjust(alb_CD$p_value, method="BY")
+alb_UC$p_adj <- p.adjust(alb_UC$p_value, method="BY")
+alb <- rbind(alb_CD, alb_UC)
+
+#Iron:
+iron_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Iron_restable_CD_comorb_onlyGP.txt", sep=" ")
+iron_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Iron_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+iron_CD$Disease <- "CD"
+iron_UC$Disease <- "UC"
+iron_CD$p_adj <- p.adjust(iron_CD$p_value, method="BY")
+iron_UC$p_adj <- p.adjust(iron_UC$p_value, method="BY")
+iron <- rbind(iron_CD, iron_UC)
+
+#VitB12:
+VitB12_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/VitB12_restable_CD_comorb_onlyGP.txt", sep=" ")
+VitB12_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/VitB12_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+VitB12_CD$Disease <- "CD"
+VitB12_UC$Disease <- "UC"
+VitB12_CD$p_adj <- p.adjust(VitB12_CD$p_value, method="BY")
+VitB12_UC$p_adj <- p.adjust(VitB12_UC$p_value, method="BY")
+VitB12 <- rbind(VitB12_CD, VitB12_UC)
+
+#Folate:
+folate_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Folate_restable_CD_comorb_onlyGP.txt", sep=" ")
+folate_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Folate_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+folate_CD$Disease <- "CD"
+folate_UC$Disease <- "UC"
+folate_CD$p_adj <- p.adjust(folate_CD$p_value, method="BY")
+folate_UC$p_adj <- p.adjust(folate_UC$p_value, method="BY")
+folate <- rbind(folate_CD, folate_UC)
+
+#ALAT:
+ALAT_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/ALAT_restable_CD_comorb_onlyGP.txt", sep=" ")
+ALAT_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/ALAT_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+ALAT_CD$Disease <- "CD"
+ALAT_UC$Disease <- "UC"
+ALAT_CD$p_adj <- p.adjust(ALAT_CD$p_value, method="BY")
+ALAT_UC$p_adj <- p.adjust(ALAT_UC$p_value, method="BY")
+ALAT <- rbind(ALAT_CD, ALAT_UC)
+
+#Bili:
+bili_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Bilirubin_restable_CD_comorb_onlyGP.txt", sep=" ")
+bili_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/Bilirubin_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+bili_CD$Disease <- "CD"
+bili_UC$Disease <- "UC"
+bili_CD$p_adj <- p.adjust(bili_CD$p_value, method="BY")
+bili_UC$p_adj <- p.adjust(bili_UC$p_value, method="BY")
+bili <- rbind(bili_CD, bili_UC)
+
+#VitD:
+vitd_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/VitD_restable_CD_comorb_onlyGP.txt", sep=" ")
+vitd_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/VitD_restable_UC_comorb_onlyGP.txt", sep=" ")
+
+vitd_CD$Disease <- "CD"
+vitd_UC$Disease <- "UC"
+vitd_CD$p_adj <- p.adjust(vitd_CD$p_value, method="BY")
+vitd_UC$p_adj <- p.adjust(vitd_UC$p_value, method="BY")
+vitd <- rbind(vitd_CD, vitd_UC)
+```
+
+Gather all in plot::
+```{r}
+# Collect all:
+crp$feature <- "CRP"
+fcal$feature <- "F-cal"
+hemo$feature <- "Hemoglobin"
+leuko$feature <- "Leukocytes"
+neutro$feature <- "Neutrophils"
+lymfo$feature <- "Lymphocytes"
+mono$feature <-  "Monocytes"
+eos$feature <- "Eosinophils"
+baso$feature <-  "Basophils"
+throm$feature <- "Platelets"
+alb$feature <- "Albumin"
+iron$feature <- "Iron"
+VitB12$feature <- "Vitamin B12"
+folate$feature <- "Folate"
+ALAT$feature <- "ALAT"
+bili$feature <- "Bilirubin"
+vitd$feature <- "Vitamin D2+D3"
+
+total <- rbind(crp, fcal, hemo, leuko, neutro, lymfo, mono, eos, baso, throm, alb, iron, VitB12, folate, ALAT, bili, vitd)
+total$sig <- ifelse(total$p_adj<0.001, "***", ifelse(total$p_adj<0.01, "**", ifelse(total$p_adj<0.05, "*", "ns")))
+
+total_CD <- total %>% filter(Disease =="CD")
+total_UC <- total %>% filter(Disease =="UC")
+
+bl <- colorRampPalette(c("navy","royalblue","lightskyblue"))(200)   
+re <- colorRampPalette(c("mistyrose", "red2","darkred"))(200)
+
+min(total_CD$t_value)
+max(total_CD$t_value)
+min(total_UC$t_value)
+max(total_UC$t_value)
+
+total_CD$feature <- factor(total_CD$feature, levels=var_order)
+total_UC$feature <- factor(total_UC$feature, levels=var_order)
+
+total_CD$time_interval <- -total_CD$time_interval
+total_UC$time_interval <- -total_UC$time_interval
+
+q1 <- ggplot(data=total_CD, aes(x=as.factor(time_interval), y=feature, fill=t_value))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-58, 58))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Crohn's disease")+labs(fill="t-value")+
+  theme(text = element_text(family="sans", size=8))
+
+q2 <- ggplot(data=total_UC, aes(x=as.factor(time_interval), y=feature, fill=t_value))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-58, 58))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Ulcerative colitis")+labs(fill="t-value")+
+  theme(text = element_text(family="sans", size=8))
+
+fig_S4C <- ggarrange(q1, q2, common.legend = T, legend="right", labels=c("C)"), font.label = list(size=10, family="sans"))
+
+#Alternative to figure S4C with estimate instead of t-value
+min(total_CD$Estimate)
+max(total_CD$Estimate)
+min(total_UC$Estimate)
+max(total_UC$Estimate)
+
+total_CD$feature <- factor(total_CD$feature, levels=var_order)
+total_UC$feature <- factor(total_UC$feature, levels=var_order)
+
+total_CD$time_interval <- -total_CD$time_interval
+total_UC$time_interval <- -total_UC$time_interval
+
+q1 <- ggplot(data=total_CD, aes(x=as.factor(time_interval), y=feature, fill=Estimate))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-3.5, 3.5))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Crohn's disease")+labs(fill="Estimate")+
+  theme(text = element_text(family="sans", size=8))
+
+q2 <- ggplot(data=total_UC, aes(x=as.factor(time_interval), y=feature, fill=Estimate))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-3.5, 3.5))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Ulcerative colitis")+labs(fill="Estimate")+
+  theme(text = element_text(family="sans", size=8))
+
+fig_S4C_alt <- ggarrange(q1, q2, common.legend = T, legend="right", labels=c("C)"), font.label = list(size=10, family="sans"))
+
+```
+
+## Figure S4B: One sample sensitivity
+
+Read in all results:
+```{r}
+#CRP
+crp_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_CRP_restable_CD_onlyGP.txt", sep=" ")
+crp_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_CRP_restable_UC_onlyGP.txt", sep=" ")
+
+crp_CD$Disease <- "CD"
+crp_UC$Disease <- "UC"
+crp_CD$p_adj <- p.adjust(crp_CD$p_value, method="BY")
+crp_UC$p_adj <- p.adjust(crp_UC$p_value, method="BY")
+crp <- rbind(crp_CD, crp_UC)
+
+#f-cal
+fcal_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Fcal_restable_CD_onlyGP.txt", sep=" ")
+fcal_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Fcal_restable_UC_onlyGP.txt", sep=" ")
+
+fcal_CD$Disease <- "CD"
+fcal_UC$Disease <- "UC"
+fcal_CD$p_adj <- p.adjust(fcal_CD$p_value, method="BY")
+fcal_UC$p_adj <- p.adjust(fcal_UC$p_value, method="BY")
+fcal <- rbind(fcal_CD, fcal_UC)
+
+#Hemo
+hemo_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Hemoglobin_restable_CD_onlyGP.txt", sep=" ")
+hemo_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Hemoglobin_restable_UC_onlyGP.txt", sep=" ")
+
+hemo_CD$Disease <- "CD"
+hemo_UC$Disease <- "UC"
+hemo_CD$p_adj <- p.adjust(hemo_CD$p_value, method="BY")
+hemo_UC$p_adj <- p.adjust(hemo_UC$p_value, method="BY")
+hemo <- rbind(hemo_CD, hemo_UC)
+
+#Leuko:
+leuko_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Leukocyt_restable_CD_onlyGP.txt", sep=" ")
+leuko_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Leukocyt_restable_UC_onlyGP.txt", sep=" ")
+
+leuko_CD$Disease <- "CD"
+leuko_UC$Disease <- "UC"
+leuko_CD$p_adj <- p.adjust(leuko_CD$p_value, method="BY")
+leuko_UC$p_adj <- p.adjust(leuko_UC$p_value, method="BY")
+leuko <- rbind(leuko_CD, leuko_UC)
+
+#Neutro:
+neutro_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Neutrocyt_restable_CD_onlyGP.txt", sep=" ")
+neutro_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Neutrocyt_restable_UC_onlyGP.txt", sep=" ")
+
+neutro_CD$Disease <- "CD"
+neutro_UC$Disease <- "UC"
+neutro_CD$p_adj <- p.adjust(neutro_CD$p_value, method="BY")
+neutro_UC$p_adj <- p.adjust(neutro_UC$p_value, method="BY")
+neutro <- rbind(neutro_CD, neutro_UC)
+
+#Lympho:
+lymfo_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Lymfocyt_restable_CD_onlyGP.txt", sep=" ")
+lymfo_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Lymfocyt_restable_UC_onlyGP.txt", sep=" ")
+
+lymfo_CD$Disease <- "CD"
+lymfo_UC$Disease <- "UC"
+lymfo_CD$p_adj <- p.adjust(lymfo_CD$p_value, method="BY")
+lymfo_UC$p_adj <- p.adjust(lymfo_UC$p_value, method="BY")
+lymfo <- rbind(lymfo_CD, lymfo_UC)
+
+#Mono:
+mono_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Monocyt_restable_CD_onlyGP.txt", sep=" ")
+mono_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Monocyt_restable_UC_onlyGP.txt", sep=" ")
+
+mono_CD$Disease <- "CD"
+mono_UC$Disease <- "UC"
+mono_CD$p_adj <- p.adjust(mono_CD$p_value, method="BY")
+mono_UC$p_adj <- p.adjust(mono_UC$p_value, method="BY")
+mono <- rbind(mono_CD, mono_UC)
+
+#Eos:
+eos_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Eosinophile_restable_CD_onlyGP.txt", sep=" ")
+eos_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Eosinophile_restable_UC_onlyGP.txt", sep=" ")
+
+eos_CD$Disease <- "CD"
+eos_UC$Disease <- "UC"
+eos_CD$p_adj <- p.adjust(eos_CD$p_value, method="BY")
+eos_UC$p_adj <- p.adjust(eos_UC$p_value, method="BY")
+eos <- rbind(eos_CD, eos_UC)
+
+#Baso:
+baso_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Basofile_restable_CD_onlyGP.txt", sep=" ")
+baso_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Basofile_restable_UC_onlyGP.txt", sep=" ")
+
+baso_CD$Disease <- "CD"
+baso_UC$Disease <- "UC"
+baso_CD$p_adj <- p.adjust(baso_CD$p_value, method="BY")
+baso_UC$p_adj <- p.adjust(baso_UC$p_value, method="BY")
+baso <- rbind(baso_CD, baso_UC)
+
+#Thrombo:
+throm_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Thrombocyt_restable_CD_onlyGP.txt", sep=" ")
+throm_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Thrombocyt_restable_UC_onlyGP.txt", sep=" ")
+
+throm_CD$Disease <- "CD"
+throm_UC$Disease <- "UC"
+throm_CD$p_adj <- p.adjust(throm_CD$p_value, method="BY")
+throm_UC$p_adj <- p.adjust(throm_UC$p_value, method="BY")
+throm <- rbind(throm_CD, throm_UC)
+
+#alb:
+alb_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Albumin_restable_CD_onlyGP.txt", sep=" ")
+alb_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Albumin_restable_UC_onlyGP.txt", sep=" ")
+
+alb_CD$Disease <- "CD"
+alb_UC$Disease <- "UC"
+alb_CD$p_adj <- p.adjust(alb_CD$p_value, method="BY")
+alb_UC$p_adj <- p.adjust(alb_UC$p_value, method="BY")
+alb <- rbind(alb_CD, alb_UC)
+
+#Iron:
+iron_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Iron_restable_CD_onlyGP.txt", sep=" ")
+iron_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Iron_restable_UC_onlyGP.txt", sep=" ")
+
+iron_CD$Disease <- "CD"
+iron_UC$Disease <- "UC"
+iron_CD$p_adj <- p.adjust(iron_CD$p_value, method="BY")
+iron_UC$p_adj <- p.adjust(iron_UC$p_value, method="BY")
+iron <- rbind(iron_CD, iron_UC)
+
+#VitB12:
+VitB12_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_VitB12_restable_CD_onlyGP.txt", sep=" ")
+VitB12_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_VitB12_restable_UC_onlyGP.txt", sep=" ")
+
+VitB12_CD$Disease <- "CD"
+VitB12_UC$Disease <- "UC"
+VitB12_CD$p_adj <- p.adjust(VitB12_CD$p_value, method="BY")
+VitB12_UC$p_adj <- p.adjust(VitB12_UC$p_value, method="BY")
+VitB12 <- rbind(VitB12_CD, VitB12_UC)
+
+#Folate:
+folate_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Folate_restable_CD_onlyGP.txt", sep=" ")
+folate_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Folate_restable_UC_onlyGP.txt", sep=" ")
+
+folate_CD$Disease <- "CD"
+folate_UC$Disease <- "UC"
+folate_CD$p_adj <- p.adjust(folate_CD$p_value, method="BY")
+folate_UC$p_adj <- p.adjust(folate_UC$p_value, method="BY")
+folate <- rbind(folate_CD, folate_UC)
+
+"ALAT:"
+ALAT_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_ALAT_restable_CD_onlyGP.txt", sep=" ")
+ALAT_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_ALAT_restable_UC_onlyGP.txt", sep=" ")
+
+ALAT_CD$Disease <- "CD"
+ALAT_UC$Disease <- "UC"
+ALAT_CD$p_adj <- p.adjust(ALAT_CD$p_value, method="BY")
+ALAT_UC$p_adj <- p.adjust(ALAT_UC$p_value, method="BY")
+ALAT <- rbind(ALAT_CD, ALAT_UC)
+
+#Bili:
+bili_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Bilirubin_restable_CD_onlyGP.txt", sep=" ")
+bili_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_Bilirubin_restable_UC_onlyGP.txt", sep=" ")
+
+bili_CD$Disease <- "CD"
+bili_UC$Disease <- "UC"
+bili_CD$p_adj <- p.adjust(bili_CD$p_value, method="BY")
+bili_UC$p_adj <- p.adjust(bili_UC$p_value, method="BY")
+bili <- rbind(bili_CD, bili_UC)
+
+#VitD:
+vitd_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_VitD_restable_CD_onlyGP.txt", sep=" ")
+vitd_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/results/One_VitD_restable_UC_onlyGP.txt", sep=" ")
+
+vitd_CD$Disease <- "CD"
+vitd_UC$Disease <- "UC"
+vitd_CD$p_adj <- p.adjust(vitd_CD$p_value, method="BY")
+vitd_UC$p_adj <- p.adjust(vitd_UC$p_value, method="BY")
+vitd <- rbind(vitd_CD, vitd_UC)
+```
+
+Gather all in plot::
+```{r}
+# Collect all:
+crp$feature <- "CRP"
+fcal$feature <- "F-cal"
+hemo$feature <- "Hemoglobin"
+leuko$feature <- "Leukocytes"
+neutro$feature <- "Neutrophils"
+lymfo$feature <- "Lymphocytes"
+mono$feature <-  "Monocytes"
+eos$feature <- "Eosinophils"
+baso$feature <-  "Basophils"
+throm$feature <- "Platelets"
+alb$feature <- "Albumin"
+iron$feature <- "Iron"
+VitB12$feature <- "Vitamin B12"
+folate$feature <- "Folate"
+ALAT$feature <- "ALAT"
+bili$feature <- "Bilirubin"
+vitd$feature <- "Vitamin D2+D3"
+
+total <- rbind(crp, fcal, hemo, leuko, neutro, lymfo, mono, eos, baso, throm, alb, iron, VitB12, folate, ALAT, bili, vitd)
+total$sig <- ifelse(total$p_adj<0.001, "***", ifelse(total$p_adj<0.01, "**", ifelse(total$p_adj<0.05, "*", "ns")))
+
+total_CD <- total %>% filter(Disease =="CD")
+total_UC <- total %>% filter(Disease =="UC")
+
+bl <- colorRampPalette(c("navy","royalblue","lightskyblue"))(200)   
+re <- colorRampPalette(c("mistyrose", "red2","darkred"))(200)
+
+min(total_CD$t_value)
+max(total_CD$t_value)
+min(total_UC$t_value)
+max(total_UC$t_value)
+
+total_CD$feature <- factor(total_CD$feature, levels=var_order)
+total_UC$feature <- factor(total_UC$feature, levels=var_order)
+
+total_CD$time_interval <- -total_CD$time_interval
+total_UC$time_interval <- -total_UC$time_interval
+
+q1 <- ggplot(data=total_CD, aes(x=as.factor(time_interval), y=feature, fill=t_value))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-60, 60))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Crohn's disease")+labs(fill="t-value")+
+  theme(text = element_text(family="sans", size=8))
+
+q2 <- ggplot(data=total_UC, aes(x=as.factor(time_interval), y=feature, fill=t_value))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-60, 60))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Ulcerative colitis")+labs(fill="t-value")+
+  theme(text = element_text(family="sans", size=8))
+
+fig_S4B <- ggarrange(q1, q2, common.legend = T, legend="right", labels=c("B)"), font.label = list(size=10, family="sans"))
+
+#Alternative to figure S4B with estimates instead of t-values
+min(total_CD$Estimate)
+max(total_CD$Estimate)
+min(total_UC$Estimate)
+max(total_UC$Estimate)
+
+total_CD$feature <- factor(total_CD$feature, levels=var_order)
+total_UC$feature <- factor(total_UC$feature, levels=var_order)
+
+total_CD$time_interval <- -total_CD$time_interval
+total_UC$time_interval <- -total_UC$time_interval
+
+q1 <- ggplot(data=total_CD, aes(x=as.factor(time_interval), y=feature, fill=Estimate))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-3.5, 3.5))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Crohn's disease")+labs(fill="Estimate")+
+  theme(text = element_text(family="sans", size=8))
+
+q2 <- ggplot(data=total_UC, aes(x=as.factor(time_interval), y=feature, fill=Estimate))+
+  geom_tile()+
+  geom_text(aes(label=sig), family="sans", size=3)+
+   scale_fill_gradientn(colours=c(bl, re), na.value = "black",limits = c(-3.5, 3.5))+
+  theme_classic()+xlab("Time interval")+ylab("")+ggtitle("Ulcerative colitis")+labs(fill="Estimate")+
+  theme(text = element_text(family="sans", size=8))
+
+fig_S4B_alt <- ggarrange(q1, q2, common.legend = T, legend="right", labels=c("B)"), font.label = list(size=10, family="sans"))
+
+```
+
+Figure S4 gathered:
+```{r}
+fig_S4 <- ggarrange(fig_S4A, fig_S4B, fig_S4C, ncol=1, nrow=3)
+
+ggsave(fig_S4, filename="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/illustrations/Figure_S4.tiff", width = 174, height = 241, units="mm", dpi=300)
+
+#Alternative to figure S4 with estimates instead of t-values
+fig_S4_alt <- ggarrange(fig_S4A_alt, fig_S4B_alt, fig_S4C_alt, ncol=1, nrow=3)
+
+ggsave(fig_S4_alt, filename="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/illustrations/Figure_S4_alt.tiff", width = 174, height = 241, units="mm", dpi=300)
+```
+
+
+## Plot Q1-Q3 ~ reference interval (for fig 1B + S3B) and histograms of transformed values (fig S2)
+
+Read in data, clean up data (as in 3_ scripts), plot transformed values (p plots, transformed as in 3_ scripts), divide in time intervals and generate Q1, M and Q3. Plot median in relation to medical reference levels (q plots).
+
+
+CRP:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/CRP_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/CRP_UC_onlyGP.txt", sep=" ")
+
+test_df_CD$VALUE <- gsub(",", ".", test_df_CD$VALUE)
+test_df_UC$VALUE <- gsub(",", ".", test_df_UC$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<4)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<4", m_CD, test_df_CD$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)>300)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub(">300", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<4)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<4", m_UC, test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>300)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">300", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+p1 <- ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("CRP - log transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+#Reference: <10 mg/L
+
+q1 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=10, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab("mg/L")+
+  ggtitle("CRP")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+```
+
+
+F-cal:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/F_cal_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/F_cal_UC_onlyGP.txt", sep=" ")
+
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<30)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<30", m_CD, test_df_CD$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)>1800)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub(">1800", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<30)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<30", m_UC, test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>1800)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">1800", m_UC, test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>3600)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">3600", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+p2 <- ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("F-cal - log transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+#Reference: <50 mg/kg
+
+q2 <- ggplot(res%>% filter(time_interval!=5))+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=50, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab("mg/kg")+
+  ggtitle("F-cal")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Leukocyt:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Leukocytes_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Leukocytes_UC_onlyGP.txt", sep=" ")
+
+test_df_CD$VALUE <- gsub(",", ".", test_df_CD$VALUE)
+test_df_UC$VALUE <- gsub(",", ".", test_df_UC$VALUE)
+
+p3 <-  ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("Leukocytes - log transformed")+
+   theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q3 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=3.5, linetype="dashed", size=1)+
+  geom_hline(yintercept=8.8, linetype = "dashed", size=1)+
+  theme_classic()+xlab("")+ylab(parse(text="10^9/L"))+
+  ggtitle("Leukocytes")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 3.5-8.8 10^9/L
+```
+
+Neutro:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Neutrophilocytes2_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Neutrophilocytes2_UC_onlyGP.txt", sep=" ")
+
+test_df_CD$VALUE <- gsub(",", ".", test_df_CD$VALUE)
+test_df_UC$VALUE <- gsub(",", ".", test_df_UC$VALUE)
+
+p4 <- ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("Neutrophils - log transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q4 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=2, linetype="dashed", size=1)+
+  geom_hline(yintercept=8.8, linetype = "dashed", size=1)+
+  theme_classic()+xlab("")+ylab(parse(text="10^9/L"))+
+  ggtitle("Neutrophils")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 2.0-8.8 10^9/L
+
+```
+
+Lympho:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Lymphocytes_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Lymphocytes_UC_onlyGP.txt", sep=" ")
+
+test_df_CD$VALUE <- gsub(",", ".", test_df_CD$VALUE)
+test_df_UC$VALUE <- gsub(",", ".", test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<0.07)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<0.07", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+p5 <-  ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("Lymphocytes - log transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q5 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=1, linetype="dashed", size=1)+
+  geom_hline(yintercept=3.5, linetype = "dashed", size=1)+
+  theme_classic()+xlab("")+ylab(parse(text="10^9/L"))+
+  ggtitle("Lymphocytes")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 1.0-3.5 10^9/L
+
+```
+
+Mono:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Monocytes_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Monocytes_UC_onlyGP.txt", sep=" ")
+
+test_df_CD$VALUE <- gsub(",", ".", test_df_CD$VALUE)
+test_df_UC$VALUE <- gsub(",", ".", test_df_UC$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<0.02)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<0.02", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<0.02)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<0.02", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+p6 <- ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("Monocytes - log transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q6 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=0.2, linetype="dashed", size=1)+
+  geom_hline(yintercept=0.8, linetype = "dashed", size=1)+
+  theme_classic()+xlab("")+ylab(parse(text="10^9/L"))+
+  ggtitle("Monocytes")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 0.2-0.8 10^9/L
+
+```
+
+Eosino:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Eosinophiles1_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Eosinophiles1_UC_onlyGP.txt", sep=" ")
+
+test_df_CD$VALUE <- gsub(",", ".", test_df_CD$VALUE)
+test_df_UC$VALUE <- gsub(",", ".", test_df_UC$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<0.02)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<0.02", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<0.02)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<0.02", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+p7 <- ggplot()+
+    geom_histogram(aes(x=sqrt(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE)))), bins=30)+ theme_classic()+ylab("Count") + xlab("Eosinophils - sqrt transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q7 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=0.5, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab(parse(text="10^9/L"))+
+  ggtitle("Eosinophils")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: <0.5*10^9 /L
+```
+
+Baso:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Basophiles_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Basophiles_UC_onlyGP.txt", sep=" ")
+
+test_df_CD$VALUE <- gsub(",", ".", test_df_CD$VALUE)
+test_df_UC$VALUE <- gsub(",", ".", test_df_UC$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<0.02)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<0.02", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<0.02)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<0.02", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+p8 <- ggplot()+
+    geom_histogram(aes(x=sqrt(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE)))), bins=30)+ theme_classic()+ylab("Count") + xlab("Basophils - sqrt transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q8 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=0.01, linetype="dashed", size=1)+
+  geom_hline(yintercept=0.1, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab(parse(text="10^9/L"))+
+  ggtitle("Basophils")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 0.01-0.10 10^9/L
+
+```
+
+Thrombo:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Thrombocytes_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Thrombocytes_UC_onlyGP.txt", sep=" ")
+
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<5)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<5", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<5)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<5", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+p9 <- ggplot()+
+    geom_histogram(aes(x=sqrt(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE)))), bins=30)+ theme_classic()+ylab("Count") + xlab("Platelets - sqrt transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q9 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=145, linetype="dashed", size=1)+
+  geom_hline(yintercept=390, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab(parse(text="10^9/L"))+
+  ggtitle("Platelets")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 145-390 10^9/L
+
+```
+
+Hemo:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Hemoglobin_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Hemoglobin_UC_onlyGP.txt", sep=" ")
+
+test_df_CD$VALUE <- gsub(",", ".", test_df_CD$VALUE)
+test_df_UC$VALUE <- gsub(",", ".", test_df_UC$VALUE)
+
+p10 <- ggplot()+
+    geom_histogram(aes(x=as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))), bins=30) + theme_classic()+ylab("Count") + xlab("Hemoglobin")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q10 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=7.3, linetype="dashed", size=1)+
+  geom_hline(yintercept=10.5, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab("nmol/L")+
+  ggtitle("Hemoglobin")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 7.3-10.5 mmol/L
+
+```
+
+Iron:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Iron_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Iron_UC_onlyGP.txt", sep=" ")
+
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<2)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<2", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<2)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<2", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+p11 <- ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("Iron - log transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q11 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=9, linetype="dashed", size=1)+
+  geom_hline(yintercept=34, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab("umol/L")+
+  ggtitle("Iron")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 9-34 umol/L
+
+```
+
+Folate:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Folate_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Folate_UC_onlyGP.txt", sep=" ")
+
+test_df_CD$VALUE <- gsub(",", ".", test_df_CD$VALUE)
+test_df_UC$VALUE <- gsub(",", ".", test_df_UC$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)>54.3)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub(">54.3", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>54.3)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">54.3", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+p12 <- ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("Folate - log transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q12 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=7, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab("nmol/L")+
+  ggtitle("Folate")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: >6-7 nmol/L
+
+```
+
+Vit B12:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/VitB12_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/VitB12_UC_onlyGP.txt", sep=" ")
+
+test_df_CD$VALUE <- gsub(",", ".", test_df_CD$VALUE)
+test_df_UC$VALUE <- gsub(",", ".", test_df_UC$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)>1400)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub(">1400", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>1400)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">1400", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+p13 <- ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("Vitamin B12 - log transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q13 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=200, linetype="dashed", size=1)+
+  geom_hline(yintercept=600, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab("pmol/L")+
+  ggtitle("Vitamin B12")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 200-600 pmol/L
+
+```
+
+Vit D:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Vitamin D1_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Vitamin D1_UC_onlyGP.txt", sep=" ")
+
+test_df_CD$VALUE <- gsub(",", ".", test_df_CD$VALUE)
+test_df_UC$VALUE <- gsub(",", ".", test_df_UC$VALUE)
+
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<10)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<10", m_CD, test_df_CD$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<12)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<12", m_CD, test_df_CD$VALUE)
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)>375)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub(">375", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<10)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<10", m_UC, test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<12)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<12", m_UC, test_df_UC$VALUE)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)>375)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub(">375", m_CD, test_df_UC$VALUE)
+rm(sub_UC)
+
+p14 <- ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE)))+1), bins=30)+ theme_classic()+ylab("Count") + xlab("Vitamin D2+D3 - log transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q14 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=50, linetype="dashed", size=1)+
+  geom_hline(yintercept=180, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab("nmol/L")+
+  ggtitle("Vitamin D2+D3")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 50-180 nmol/L
+
+
+```
+
+ALAT:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/ALAT_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/ALAT_UC_onlyGP.txt", sep=" ")
+
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<3)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<3", 3, test_df_CD$VALUE)
+rm(sub_CD)
+
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<3)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<3", 3, test_df_UC$VALUE)
+rm(sub_UC)
+
+p15 <- ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("ALAT - log transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q15 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=10, linetype="dashed", size=1)+
+  geom_hline(yintercept=70, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab("U/L")+
+  ggtitle("ALAT")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 10-70 U/L (10-45 for kvinder)
+
+```
+
+ALbumin:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Albumin1_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Albumin1_UC_onlyGP.txt", sep=" ")
+
+p16 <- ggplot()+
+    geom_histogram(aes(x=as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))), bins=30) + theme_classic()+ylab("Count") + xlab("Albumin")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q16 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=36, linetype="dashed", size=1)+
+  geom_hline(yintercept=48, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab("g/L")+
+  ggtitle("Albumin")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 36-48 g/L
+
+```
+
+Bili:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Bilirubin_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Bilirubin_UC_onlyGP.txt", sep=" ")
+
+sub_CD <- test_df_CD %>% filter(as.numeric(VALUE)<3)
+m_CD <- median(as.numeric(sub_CD$VALUE))
+test_df_CD$VALUE <- gsub("<3", m_CD, test_df_CD$VALUE)
+rm(sub_CD)
+sub_UC <- test_df_UC %>% filter(as.numeric(VALUE)<3)
+m_UC <- median(as.numeric(sub_UC$VALUE))
+test_df_UC$VALUE <- gsub("<3", m_UC, test_df_UC$VALUE)
+rm(sub_UC)
+
+p17 <- ggplot()+
+    geom_histogram(aes(x=log(as.numeric(c(test_df_CD$VALUE, test_df_UC$VALUE))+1)), bins=30)+ theme_classic()+ylab("Count") + xlab("Bilirubin - log transformed")+
+  theme(text = element_text(family="sans", size=8))
+
+test_df_CD <- test_df_CD%>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+test_df_UC <- test_df_UC %>% mutate(time_interval = ifelse(sampling_to_diag<365.25, 1, ifelse(sampling_to_diag<2*365.25, 2, ifelse(sampling_to_diag<3*365.25,3, ifelse(sampling_to_diag<4*365.25,4, ifelse(sampling_to_diag<5*365.25,5, ifelse(sampling_to_diag<6*365.25,6,ifelse(sampling_to_diag<7*365.25,7,ifelse(sampling_to_diag<8*365.25,8, ifelse(sampling_to_diag<9*365.25,9,ifelse(sampling_to_diag<10*365.25,10,11)))))))))))
+
+res_CD <- test_df_CD %>% filter(IBD=="CD")
+res_CD <- res_CD %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD <- res_CD %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD_HC <- test_df_CD %>% filter(IBD == "Control")
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_CD_HC <- res_CD_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC <- test_df_UC %>% filter(IBD=="UC")
+res_UC <- res_UC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC <- res_UC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_UC_HC <- test_df_UC %>% filter(IBD=="Control")
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval, lbnr) %>% summarise(val = median(as.numeric(VALUE)))
+res_UC_HC <- res_UC_HC %>% dplyr::group_by(time_interval) %>% summarise(Q1 = quantile(val, 0.25), Q3=quantile(val, 0.75), M = quantile(val, 0.5), mean = mean(val))
+
+res_CD$Disease <- "CD"
+res_UC$Disease <- "UC"
+res_CD_HC$Disease <- "CD controls"
+res_UC_HC$Disease <- "UC controls"
+res <- rbind(res_CD, res_UC, res_CD_HC, res_UC_HC)
+
+q17 <- ggplot(res)+
+  geom_line(aes(x=-time_interval, y=M, color=Disease, group=Disease))+
+  geom_hline(yintercept=5, linetype="dashed", size=1)+
+  geom_hline(yintercept=25, linetype="dashed", size=1)+
+  theme_classic()+xlab("")+ylab("umol/L")+
+  ggtitle("Bilirubin")+ scale_x_continuous(breaks=seq(-9, -1), limits=c(-9.2,-0.8))+
+  theme(text = element_text(family="sans", size=8))
+
+#Reference: 5-25 umol/L
+
+```
+
+Combine all into fig 1B, fig S3B and fig S2:
+```{r}
+#Figure 1B
+fig_1B <- ggarrange(q1, q3, q4, q6, q7, q9, q10+xlab("Time interval"), q11+xlab("Time interval"), q16+xlab("Time interval"), common.legend = T, legend = "bottom", ncol=3, nrow = 3, labels="B)", font.label = list(size=10, family="sans"))
+
+#Combine fig_1A and fig_1B:
+fig_1 <- ggarrange(fig_1A, fig_1B, ncol=1, nrow=2, heights = c(0.5,1))
+
+ggsave(fig_1, filename="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/illustrations/Figure_1.tiff", width = 174, height = 241, units="mm", dpi=300)
+
+#Combine the alternative fig_1A and fig_1B:
+fig_1_alt <- ggarrange(fig_1A_alt, fig_1B, ncol=1, nrow=2, heights = c(0.5,1))
+
+ggsave(fig_1_alt, filename="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/illustrations/Figure_1_alt.tiff", width = 174, height = 241, units="mm", dpi=300)
+
+#Figure S3B:
+leg <- get_legend(q1) #Keep separate legend to add to the last plot slot
+
+fig_S3B <- ggarrange(q2+theme(legend.position = "none"), q5+theme(legend.position = "none"), q8+theme(legend.position = "none"), q12+theme(legend.position = "none"), q13+theme(legend.position = "none"), q14+theme(legend.position = "none")+xlab("Time interval"), q15+theme(legend.position = "none")+xlab("Time interval"), q17+theme(legend.position = "none")+xlab("Time interval"), leg, ncol=3, nrow = 3, labels="B)", font.label = list(size=10, family="sans"))
+
+#Combine fig_S3A and fig_S3B:
+fig_S3 <- ggarrange(fig_S3A, fig_S3B, ncol=1, nrow=2, heights = c(0.5,1))
+
+ggsave(fig_S3, filename="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/illustrations/Figure_S3.tiff", width = 174, height = 241, units="mm", dpi=300)
+
+#Figure S2:
+fig_S2 <- ggarrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, ncol=3, nrow = 6)
+
+ggsave(fig_S2, filename="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/illustrations/Figure_S2.tiff", width = 174, height = 241, units="mm", dpi=300)
+
+```
+
+
+## Violin plots: Number of samples ~ time until diagnosis (figure S1)
+
+CRP:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/CRP_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/CRP_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p1 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("CRP")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+F-cal:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/F_cal_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/F_cal_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p2 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("F-cal")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Leukocyt:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Leukocytes_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Leukocytes_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p3 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Leukocytes")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Neutro:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Neutrophilocytes2_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Neutrophilocytes2_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p4 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Neutrophils")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Lympho:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Lymphocytes_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Lymphocytes_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p5 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Lymphocytes")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Mono:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Monocytes_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Monocytes_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p6 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Monocytes")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Eosino:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Eosinophiles1_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Eosinophiles1_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p7 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Eosinophils")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Baso:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Basophiles_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Basophiles_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p8 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Basophils")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Thrombo:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Thrombocytes_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Thrombocytes_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p9 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Platelets")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Hemo:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Hemoglobin_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Hemoglobin_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p10 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Hemoglobin")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Iron:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Iron_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Iron_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p11 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Iron")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Folate:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Folate_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Folate_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p12 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Folate")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Vit B12:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/VitB12_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/VitB12_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p13 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Vitamin B12")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Vit D:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Vitamin D1_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Vitamin D1_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p14 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Vitamin D2+D3")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+ALAT:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/ALAT_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/ALAT_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p15 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("ALAT")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+
+ALbumin:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Albumin1_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Albumin1_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p16 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Albumin")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Bili:
+```{r}
+test_df_CD <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Bilirubin_CD_onlyGP.txt", sep=" ")
+test_df_UC <- read.csv("F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/Bilirubin_UC_onlyGP.txt", sep=" ")
+
+test_df_CD <- test_df_CD %>% mutate(IBD = fct_relevel(IBD, "Control", "CD"))
+test_df <- rbind(test_df_CD, test_df_UC)
+
+p17 <- ggplot(data=test_df)+
+    geom_violin(aes(x=-sampling_to_diag , y=IBD))+
+  theme_classic()+ylab("")+xlab("")+ggtitle("Bilirubin")+
+  theme(text = element_text(family="sans", size=8))
+```
+
+Combine all -> figure S1:
+```{r}
+fig_S1 <- ggarrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, p16, p17, ncol = 4, nrow=5)
+
+fig_S1 <- annotate_figure(fig_S1, bottom=text_grob("Days to diagnosis"))
+
+ggsave(fig_S1, filename="F:/Projekter/FSEID00001565/Data/Subprojects/Marie_IBD_clinical_biomarker/illustrations/Figure_S1.tiff", width = 174, height = 241, units="mm", dpi=300)
+
+```
