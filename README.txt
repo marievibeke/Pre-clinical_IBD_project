@@ -1,4 +1,4 @@
-## Characterising the pre-clinical phase of inflammatory bowel disease
+##Characterising the pre-clinical phase of inflammatory bowel disease
 
 This project folder contains code generated for the project "Characterising the pre-clinical phase of inflammatory bowel disease".
 
