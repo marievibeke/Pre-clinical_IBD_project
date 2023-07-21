@@ -1,4 +1,6 @@
-Read me file for the project: An overview of the code.
+## Characterising the pre-clinical phase of inflammatory bowel disease
+
+This project folder contains code generated for the project "Characterising the pre-clinical phase of inflammatory bowel disease".
 
 The files are ordered by numbers. 
 - 1: Code file to prepare helper datasets. These datasets are saved in the "temp" folder
