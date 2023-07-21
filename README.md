@@ -1,4 +1,4 @@
-##Characterising the pre-clinical phase of inflammatory bowel disease
+## Characterising the pre-clinical phase of inflammatory bowel disease
 
 This project folder contains code generated for the project "Characterising the pre-clinical phase of inflammatory bowel disease".
 
@@ -9,3 +9,4 @@ The files are ordered by numbers.
 - 4: Generations of plots for visualisation of data and analyses performed so far. Also including the code for making figure 1, S1, S2, S3 and S4.
 - 5: Code file for the extended analysis, where several features are combined in prediction model. Includes the selection of number of features, the new matching (cases and controls should have a measure of all features within the same time interval), logisitc regression, Random Forest analyses, SVM analyses and the generation of figure 2 and S5.
 - 6: Code for making table 1.  
+
